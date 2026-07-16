@@ -1,0 +1,1 @@
+Production-ready Next.js src folder structure.
