@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 10, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/sujan/OneDrive/Desktop/Hospital%20Management/frontend/src/app/page.tsx"],"sourcesContent":["export default function Home(){return null}"],"names":["Home"],"mappings":";;;;AAAe,SAASA;IAAO,OAAO;AAAI"}}]
-}
