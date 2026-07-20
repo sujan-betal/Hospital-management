@@ -1,126 +1,119 @@
 "use client"
 
 import { useState } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { Eye, EyeOff, Lock, Mail, ArrowRight, LogIn } from "lucide-react"
-import Link from "next/link"
-
-import { staffLoginSchema, type StaffLoginFormData } from "../schemas/login-schema"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Eye, EyeOff, Lock, Mail, LogIn } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 export function StaffLoginForm() {
+  const router = useRouter()
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<StaffLoginFormData>({
-    resolver: zodResolver(staffLoginSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-    },
-  })
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const errs: Record<string, string> = {}
+    if (!/^\S+@\S+\.\S+$/.test(email)) errs.email = "Enter a valid email address"
+    if (password.length < 6) errs.password = "Password must be at least 6 characters"
+    setErrors(errs)
+    if (Object.keys(errs).length) return
 
-  const onSubmit = async (data: StaffLoginFormData) => {
-    await new Promise((r) => setTimeout(r, 1500))
-    console.log("Staff login:", data)
+    setSubmitting(true)
+    await new Promise((r) => setTimeout(r, 1400))
+    setSubmitting(false)
+    router.push("/admin")
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-      <div className="space-y-2">
-        <Label htmlFor="email" className="text-sm font-medium text-gray-700">
-          Email Address
-        </Label>
-        <div className="relative">
-          <div className="absolute left-0 top-0 bottom-0 flex items-center pl-3 pointer-events-none">
-            <Mail className="h-4 w-4 text-gray-400" />
+    <form onSubmit={submit} className="space-y-4">
+      <div className="space-y-1.5">
+        <label htmlFor="email" className="text-[13px] font-semibold text-[#12463E] tracking-wide">
+          Email address
+        </label>
+        <div className="relative group">
+          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#6B8078] group-focus-within:text-[#12463E] transition-colors">
+            <Mail className="h-4 w-4" strokeWidth={2} />
           </div>
-          <Input
+          <input
             id="email"
             type="email"
             placeholder="doctor@hospital.com"
-            className="pl-10 h-11 bg-gray-50 border-gray-200 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all rounded-xl"
-            {...register("email")}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full h-12 pl-10 pr-3 rounded-xl border border-[#D7E2DC] bg-[#F6F8F7] text-sm text-[#0B2B26] placeholder:text-[#9CAEA6] focus:outline-none focus:ring-2 focus:ring-[#12463E]/20 focus:border-[#12463E] transition-all"
           />
         </div>
         {errors.email && (
-          <p className="text-sm text-red-500 flex items-center gap-1 mt-1">
-            <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>
-            {errors.email.message}
+          <p className="text-xs text-[#C4392A] flex items-center gap-1.5 pl-0.5">
+            <span className="w-1 h-1 rounded-full bg-[#C4392A]" />
+            {errors.email}
           </p>
         )}
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-0.5">
         <div className="flex items-center justify-between">
-          <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+          <label htmlFor="password" className="text-[13px] font-semibold text-[#12463E] tracking-wide">
             Password
-          </Label>
-          <Link
-            href="/forgot-password"
-            className="text-xs text-blue-600 hover:text-blue-700 font-medium hover:underline"
-          >
-            Forgot password?
-          </Link>
+          </label>
+
         </div>
-        <div className="relative">
-          <div className="absolute left-0 top-0 bottom-0 flex items-center pl-3 pointer-events-none">
-            <Lock className="h-4 w-4 text-gray-400" />
+        <div className="relative group">
+          <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#6B8078] group-focus-within:text-[#12463E] transition-colors">
+            <Lock className="h-4 w-4" strokeWidth={2} />
           </div>
-          <Input
+          <input
             id="password"
             type={showPassword ? "text" : "password"}
-            placeholder="••••••••"
-            className="pl-10 pr-10 h-11 bg-gray-50 border-gray-200 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all rounded-xl"
-            {...register("password")}
+            placeholder="Enter your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full h-12 pl-10 pr-10 rounded-xl border border-[#D7E2DC] bg-[#F6F8F7] text-sm text-[#0B2B26] placeholder:text-[#9CAEA6] focus:outline-none focus:ring-2 focus:ring-[#12463E]/20 focus:border-[#12463E] transition-all"
           />
           <button
             type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-0 top-0 bottom-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors"
             tabIndex={-1}
+            onClick={() => setShowPassword((v) => !v)}
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#9CAEA6] hover:text-[#12463E] transition-colors"
           >
-            {showPassword ? (
-              <EyeOff className="h-4 w-4" />
-            ) : (
-              <Eye className="h-4 w-4" />
-            )}
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
+        <div className="text-right">
+          <a
+            href="/forgot-password"
+            className="text-xs text-[#E85C4A] font-semibold hover:underline"
+          >
+            Forgot password?
+          </a>
+        </div>
         {errors.password && (
-          <p className="text-sm text-red-500 flex items-center gap-1 mt-1">
-            <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>
-            {errors.password.message}
+          <p className="text-xs text-[#C4392A] flex items-center gap-1.5 pl-0.5">
+            <span className="w-1 h-1 rounded-full bg-[#C4392A]" />
+            {errors.password}
           </p>
         )}
       </div>
 
-      <Button
+
+      <button
         type="submit"
-        className="w-full gap-2 h-11 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all disabled:opacity-50"
-        disabled={isSubmitting}
+        disabled={submitting}
+        className="w-full h-12 rounded-xl bg-[#12463E] hover:bg-[#0B2B26] text-white font-semibold text-sm shadow-lg shadow-[#12463E]/25 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
       >
-        {isSubmitting ? (
+        {submitting ? "Signing in..." : (
           <>
-            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-            Signing in...
-          </>
-        ) : (
-          <>
+            Sign in
             <LogIn className="h-4 w-4" />
-            Sign In
           </>
         )}
-      </Button>
+      </button>
+
+      <p className="text-center text-xs text-[#9CAEA6] pt-1">
+        Contact your administrator if you need access
+      </p>
     </form>
   )
 }

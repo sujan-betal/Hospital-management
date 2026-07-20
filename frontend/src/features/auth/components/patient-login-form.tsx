@@ -1,139 +1,136 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
 import { Send, ShieldCheck, Smartphone, Check, ArrowRight } from "lucide-react"
 
-import { patientLoginSchema, type PatientLoginFormData } from "../schemas/login-schema"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+function Field({ icon: Icon, error, children }) {
+  return (
+    <div className="space-y-1.5">
+      <div className="relative group">
+        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#6B8078] group-focus-within:text-[#12463E] transition-colors">
+          <Icon className="h-4 w-4" strokeWidth={2} />
+        </div>
+        {children}
+      </div>
+      {error && (
+        <p className="text-xs text-[#C4392A] flex items-center gap-1.5 pl-0.5">
+          <span className="w-1 h-1 rounded-full bg-[#C4392A]" />
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
 
 export function PatientLoginForm() {
+  const [phone, setPhone] = useState("")
+  const [otp, setOtp] = useState("")
   const [otpSent, setOtpSent] = useState(false)
   const [countdown, setCountdown] = useState(0)
   const [captchaVerified, setCaptchaVerified] = useState(false)
-  const otpInputRef = useRef<HTMLInputElement>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const otpRef = useRef<HTMLInputElement>(null)
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    formState: { errors, isSubmitting },
-  } = useForm<PatientLoginFormData>({
-    resolver: zodResolver(patientLoginSchema),
-    defaultValues: {
-      phone: "",
-      otp: "",
-    },
-  })
-
-  const phoneValue = watch("phone")
-  const otpValue = watch("otp")
-  const isPhoneValid = (phoneValue || "").length >= 10
+  const isPhoneValid = /^\d{10}$/.test(phone)
 
   useEffect(() => {
-    if (countdown > 0) {
-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000)
-      return () => clearTimeout(timer)
-    }
+    if (countdown <= 0) return
+    const t = setTimeout(() => setCountdown((c) => c - 1), 1000)
+    return () => clearTimeout(t)
   }, [countdown])
 
   useEffect(() => {
-    if (otpSent && otpInputRef.current) {
-      otpInputRef.current.focus()
-    }
+    if (otpSent) otpRef.current?.focus()
   }, [otpSent])
 
-  const onSubmit = async (data: PatientLoginFormData) => {
-    await new Promise((r) => setTimeout(r, 1500))
-    console.log("Patient login:", data)
-  }
-
-  const handleSendOtp = () => {
+  const sendOtp = () => {
+    if (!isPhoneValid) {
+      setErrors({ phone: "Enter a valid 10-digit phone number" })
+      return
+    }
+    setErrors({})
     setOtpSent(true)
     setCountdown(30)
   }
 
-  const handleResendOtp = () => {
-    setCountdown(30)
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const errs: Record<string, string> = {}
+    if (!isPhoneValid) errs.phone = "Enter a valid 10-digit phone number"
+    if (otpSent && !/^\d{6}$/.test(otp)) errs.otp = "Enter the 6-digit code"
+    if (!captchaVerified) errs.captcha = "Please verify you're not a robot"
+    setErrors(errs)
+    if (Object.keys(errs).length) return
+
+    setSubmitting(true)
+    await new Promise((r) => setTimeout(r, 1400))
+    setSubmitting(false)
+    console.log("Patient login:", { phone, otp })
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-      <div className="space-y-2">
-        <Label htmlFor="phone" className="text-sm font-medium text-gray-700">
-          Phone Number
-        </Label>
-        <div className="relative">
-          <div className="absolute left-0 top-0 bottom-0 flex items-center pl-3 pointer-events-none">
-            <Smartphone className="h-4 w-4 text-gray-400" />
-          </div>
-          <Input
+    <form onSubmit={submit} className="space-y-4">
+      <div className="space-y-1.5">
+        <label htmlFor="phone" className="text-[13px] font-semibold text-[#12463E] tracking-wide">
+          Phone number
+        </label>
+        <Field icon={Smartphone} error={errors.phone}>
+          <input
             id="phone"
             type="tel"
-            placeholder="+1 (555) 123-4567"
-            className="pl-10 h-11 bg-gray-50 border-gray-200 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all rounded-xl"
-            {...register("phone")}
+            inputMode="numeric"
+            placeholder="98765 43210"
+            value={phone}
+            disabled={otpSent}
+            onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+            className="w-full h-12 pl-10 pr-3 rounded-xl border border-[#D7E2DC] bg-[#F6F8F7] text-sm text-[#0B2B26] placeholder:text-[#9CAEA6] focus:outline-none focus:ring-2 focus:ring-[#12463E]/20 focus:border-[#12463E] disabled:opacity-60 transition-all"
           />
-        </div>
-        {errors.phone && (
-          <p className="text-sm text-red-500 flex items-center gap-1 mt-1">
-            <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>
-            {errors.phone.message}
-          </p>
-        )}
+        </Field>
       </div>
 
       {!otpSent ? (
-        <Button
+        <button
           type="button"
-          variant="outline"
-          className="w-full gap-2 h-11 rounded-xl border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300 transition-all"
+          onClick={sendOtp}
           disabled={!isPhoneValid}
-          onClick={handleSendOtp}
+          className="w-full h-11 rounded-xl border border-[#12463E]/30 text-[#12463E] font-semibold text-sm flex items-center justify-center gap-2 hover:bg-[#12463E]/5 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
         >
           <Send className="h-4 w-4" />
           Send OTP
-        </Button>
+        </button>
       ) : (
-        <div className="animate-slide-down space-y-2">
-          <Label htmlFor="otp" className="text-sm font-medium text-gray-700">
-            One-Time Password
-          </Label>
-          <div className="relative">
-            <Input
-              ref={otpInputRef}
-              id="otp"
-              type="text"
-              inputMode="numeric"
-              maxLength={6}
-              placeholder="Enter 6-digit OTP"
-              className="h-11 bg-gray-50 border-gray-200 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all rounded-xl text-center text-lg font-mono tracking-[0.5em]"
-              {...register("otp")}
-            />
-          </div>
+        <div className="space-y-1.5">
+          <label htmlFor="otp" className="text-[13px] font-semibold text-[#12463E] tracking-wide">
+            One-time code
+          </label>
+          <input
+            ref={otpRef}
+            id="otp"
+            type="text"
+            inputMode="numeric"
+            maxLength={6}
+            placeholder="······"
+            value={otp}
+            onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            className="w-full h-12 rounded-xl border border-[#D7E2DC] bg-[#F6F8F7] text-center text-lg font-mono tracking-[0.6em] text-[#0B2B26] placeholder:text-[#C3CFC9] focus:outline-none focus:ring-2 focus:ring-[#12463E]/20 focus:border-[#12463E] transition-all"
+          />
           {errors.otp && (
-            <p className="text-sm text-red-500 flex items-center gap-1 mt-1">
-              <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" /></svg>
-              {errors.otp.message}
+            <p className="text-xs text-[#C4392A] flex items-center gap-1.5 pl-0.5">
+              <span className="w-1 h-1 rounded-full bg-[#C4392A]" />
+              {errors.otp}
             </p>
           )}
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-500">
-              Didn&apos;t receive code?
+          <div className="flex items-center justify-between pt-0.5">
+            <p className="text-xs text-[#6B8078]">
+              Sent to +91 {phone.slice(0, 5)} {phone.slice(5)}
             </p>
             {countdown > 0 ? (
-              <span className="text-xs text-gray-400 font-medium">
+              <span className="text-xs text-[#9CAEA6] font-medium tabular-nums">
                 Resend in {countdown}s
               </span>
             ) : (
-              <button
-                type="button"
-                onClick={handleResendOtp}
-                className="text-xs text-blue-600 hover:text-blue-700 font-medium hover:underline"
-              >
+              <button type="button" onClick={() => setCountdown(30)} className="text-xs text-[#E85C4A] font-semibold hover:underline">
                 Resend OTP
               </button>
             )}
@@ -142,66 +139,54 @@ export function PatientLoginForm() {
       )}
 
       <div
-        className={`rounded-xl border p-4 flex items-center gap-3 cursor-pointer transition-all ${
-          captchaVerified
-            ? "border-green-300 bg-green-50"
-            : "border-gray-200 bg-gray-50 hover:bg-gray-100"
-        }`}
-        onClick={() => setCaptchaVerified(!captchaVerified)}
+        onClick={() => setCaptchaVerified((v) => !v)}
         role="checkbox"
         aria-checked={captchaVerified}
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === " " || e.key === "Enter") {
             e.preventDefault()
-            setCaptchaVerified(!captchaVerified)
+            setCaptchaVerified((v) => !v)
           }
         }}
+        className={`rounded-xl border p-3.5 flex items-center gap-3 cursor-pointer transition-all ${
+          captchaVerified ? "border-[#12463E]/40 bg-[#12463E]/[0.06]" : "border-[#D7E2DC] bg-[#F6F8F7] hover:border-[#B9C7C2]"
+        }`}
       >
         <div
-          className={`flex items-center justify-center w-9 h-9 rounded-lg border-2 transition-all shrink-0 ${
-            captchaVerified
-              ? "bg-blue-600 border-blue-600"
-              : "bg-white border-gray-300"
+          className={`flex items-center justify-center w-7 h-7 rounded-lg border-2 shrink-0 transition-all ${
+            captchaVerified ? "bg-[#12463E] border-[#12463E]" : "bg-white border-[#C3CFC9]"
           }`}
         >
-          {captchaVerified && (
-            <Check className="h-5 w-5 text-white" />
-          )}
+          {captchaVerified && <Check className="h-4 w-4 text-white" strokeWidth={3} />}
         </div>
-        <div className="flex-1">
-          <p className={`text-sm font-medium ${captchaVerified ? "text-green-700" : "text-gray-600"}`}>
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-medium ${captchaVerified ? "text-[#12463E]" : "text-[#4B5F58]"}`}>
             I&apos;m not a robot
           </p>
-          <p className="text-xs text-gray-400">
-            reCAPTCHA verification
-          </p>
+          <p className="text-[11px] text-[#9CAEA6] mt-0.5">reCAPTCHA verification</p>
         </div>
-        <div className="flex items-center gap-1">
-          <ShieldCheck className={`h-5 w-5 ${captchaVerified ? "text-green-500" : "text-gray-300"}`} />
-        </div>
+        <ShieldCheck className={`h-5 w-5 shrink-0 ${captchaVerified ? "text-[#12463E]" : "text-[#C3CFC9]"}`} />
       </div>
+      {errors.captcha && (
+        <p className="text-xs text-[#C4392A] flex items-center gap-1.5 -mt-2 pl-0.5">
+          <span className="w-1 h-1 rounded-full bg-[#C4392A]" />
+          {errors.captcha}
+        </p>
+      )}
 
-      <Button
+      <button
         type="submit"
-        className="w-full gap-2 h-11 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all disabled:opacity-50"
-        disabled={isSubmitting || !captchaVerified || (otpSent && !otpValue)}
+        disabled={submitting}
+        className="w-full h-12 rounded-xl bg-[#12463E] hover:bg-[#0B2B26] text-white font-semibold text-sm shadow-lg shadow-[#12463E]/25 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
       >
-        {isSubmitting ? (
+        {submitting ? "Verifying..." : (
           <>
-            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-            Verifying...
-          </>
-        ) : (
-          <>
+            Verify &amp; login
             <ArrowRight className="h-4 w-4" />
-            Verify & Login
           </>
         )}
-      </Button>
+      </button>
     </form>
   )
 }
