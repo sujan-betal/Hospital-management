@@ -8,16 +8,19 @@ import { WardsAndBeds } from "./components/WardsAndBeds"
 import { PatientAdmissions } from "./components/PatientAdmissions"
 import { AttendingDoctors } from "./components/AttendingDoctors"
 import { ClinicalTasks } from "./components/ClinicalTasks"
+import { StaffCredentials } from "./components/StaffCredentials"
 import { HospitalSettings } from "./components/HospitalSettings"
 import {
   initialBeds,
   initialAdmissions,
   initialDoctors,
   initialMedicalTasks,
+  initialStaffCredentials,
   Bed,
   Admission,
   Doctor,
-  MedicalTask
+  MedicalTask,
+  StaffCredential
 } from "./mockData"
 
 export default function AdminDashboard() {
@@ -28,6 +31,7 @@ export default function AdminDashboard() {
   const [admissions, setAdmissions] = useState<Admission[]>(initialAdmissions)
   const [doctors, setDoctors] = useState<Doctor[]>(initialDoctors)
   const [tasks, setTasks] = useState<MedicalTask[]>(initialMedicalTasks)
+  const [staffCredentials, setStaffCredentials] = useState<StaffCredential[]>(initialStaffCredentials)
 
   // Modal triggers
   const [isAddAdmissionOpen, setIsAddAdmissionOpen] = useState(false)
@@ -163,6 +167,14 @@ export default function AdminDashboard() {
             onUpdateTask={handleUpdateTask}
             isCreateOpen={isAddTaskOpen}
             setIsCreateOpen={setIsAddTaskOpen}
+          />
+        )
+      case "credentials":
+        return (
+          <StaffCredentials
+            credentials={staffCredentials}
+            onAddCredential={(cred) => setStaffCredentials([cred, ...staffCredentials])}
+            onUpdateCredential={(cred) => setStaffCredentials(staffCredentials.map(c => c.id === cred.id ? cred : c))}
           />
         )
       case "settings":

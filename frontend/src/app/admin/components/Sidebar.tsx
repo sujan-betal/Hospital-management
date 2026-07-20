@@ -9,7 +9,8 @@ import {
   Activity,
   Settings,
   LogOut,
-  Stethoscope
+  Stethoscope,
+  KeyRound
 } from "lucide-react"
 
 interface SidebarProps {
@@ -24,6 +25,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     { id: "admissions", label: "Patient Admissions", icon: CalendarRange },
     { id: "doctors", label: "Attending Doctors", icon: Stethoscope },
     { id: "tasks", label: "Nursing & Medical Tasks", icon: Activity },
+    { id: "credentials", label: "Staff Credentials", icon: KeyRound },
     { id: "settings", label: "Hospital Configs", icon: Settings },
   ]
 

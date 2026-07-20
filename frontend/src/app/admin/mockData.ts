@@ -84,3 +84,105 @@ export const initialMedicalTasks: MedicalTask[] = [
   { id: "TSK-8815", bedId: "GEN-301", task: "Collect blood samples for comprehensive CBC and glucose test", priority: "high", assignedTo: "Nurse Maria Gomez", status: "completed", type: "lab-test", timestamp: "08:15 AM" },
   { id: "TSK-8816", bedId: "PED-401", task: "Administer saline nebulizer", priority: "low", assignedTo: "Nurse John Doe", status: "completed", type: "nursing", timestamp: "09:30 AM" },
 ]
+
+/* ─── Staff Credentials ─── */
+export interface StaffCredential {
+  id: string
+  fullName: string
+  role: "doctor" | "receptionist"
+  email: string
+  phone: string
+  department: string
+  employeeId: string
+  status: "active" | "suspended" | "inactive"
+  createdAt: string
+  lastLogin: string | null
+}
+
+export const initialStaffCredentials: StaffCredential[] = [
+  {
+    id: "CRED-001",
+    fullName: "Dr. Gregory House",
+    role: "doctor",
+    email: "house@auramedical.org",
+    phone: "+91 98765 43210",
+    department: "General Medicine",
+    employeeId: "EMP-D001",
+    status: "active",
+    createdAt: "2026-01-15",
+    lastLogin: "2026-07-20 09:15 AM"
+  },
+  {
+    id: "CRED-002",
+    fullName: "Dr. Meredith Grey",
+    role: "doctor",
+    email: "grey@auramedical.org",
+    phone: "+91 98765 43211",
+    department: "Neurology",
+    employeeId: "EMP-D002",
+    status: "active",
+    createdAt: "2026-02-10",
+    lastLogin: "2026-07-19 03:42 PM"
+  },
+  {
+    id: "CRED-003",
+    fullName: "Dr. Stephen Strange",
+    role: "doctor",
+    email: "strange@auramedical.org",
+    phone: "+91 98765 43212",
+    department: "Cardiology",
+    employeeId: "EMP-D003",
+    status: "active",
+    createdAt: "2026-03-05",
+    lastLogin: "2026-07-18 11:00 AM"
+  },
+  {
+    id: "CRED-004",
+    fullName: "Priya Sharma",
+    role: "receptionist",
+    email: "priya.sharma@auramedical.org",
+    phone: "+91 91234 56789",
+    department: "Front Desk - OPD",
+    employeeId: "EMP-R001",
+    status: "active",
+    createdAt: "2026-01-20",
+    lastLogin: "2026-07-20 08:30 AM"
+  },
+  {
+    id: "CRED-005",
+    fullName: "Rahul Verma",
+    role: "receptionist",
+    email: "rahul.verma@auramedical.org",
+    phone: "+91 91234 56790",
+    department: "Front Desk - Emergency",
+    employeeId: "EMP-R002",
+    status: "active",
+    createdAt: "2026-04-12",
+    lastLogin: "2026-07-20 07:45 AM"
+  },
+  {
+    id: "CRED-006",
+    fullName: "Dr. Allison Cameron",
+    role: "doctor",
+    email: "cameron@auramedical.org",
+    phone: "+91 98765 43213",
+    department: "Pediatrics",
+    employeeId: "EMP-D004",
+    status: "inactive",
+    createdAt: "2026-02-28",
+    lastLogin: null
+  },
+  {
+    id: "CRED-007",
+    fullName: "Anita Desai",
+    role: "receptionist",
+    email: "anita.desai@auramedical.org",
+    phone: "+91 91234 56791",
+    department: "Front Desk - Maternity",
+    employeeId: "EMP-R003",
+    status: "suspended",
+    createdAt: "2026-05-01",
+    lastLogin: "2026-06-15 04:20 PM"
+  },
+]
+
