@@ -23,7 +23,28 @@ export function StaffLoginForm() {
     setSubmitting(true)
     await new Promise((r) => setTimeout(r, 1400))
     setSubmitting(false)
-    router.push("/admin")
+    
+    const emailLower = email.toLowerCase()
+    if (
+      emailLower.includes("doctor") || 
+      emailLower.includes("doc") || 
+      emailLower.includes("house") || 
+      emailLower.includes("grey") || 
+      emailLower.includes("strange") || 
+      emailLower.includes("cameron")
+    ) {
+      router.push("/doctor")
+    } else if (
+      emailLower.includes("receptionist") || 
+      emailLower.includes("recep") || 
+      emailLower.includes("priya") || 
+      emailLower.includes("rahul") || 
+      emailLower.includes("anita")
+    ) {
+      router.push("/receptionist")
+    } else {
+      router.push("/admin")
+    }
   }
 
   return (

@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Send, ShieldCheck, Smartphone, Check, ArrowRight } from "lucide-react"
+import { useRouter } from "next/navigation"
+
 
 function Field({ icon: Icon, error, children }) {
   return (
@@ -23,6 +25,7 @@ function Field({ icon: Icon, error, children }) {
 }
 
 export function PatientLoginForm() {
+  const router = useRouter()
   const [phone, setPhone] = useState("")
   const [otp, setOtp] = useState("")
   const [otpSent, setOtpSent] = useState(false)
@@ -67,6 +70,7 @@ export function PatientLoginForm() {
     await new Promise((r) => setTimeout(r, 1400))
     setSubmitting(false)
     console.log("Patient login:", { phone, otp })
+    router.push("/patient")
   }
 
   return (
