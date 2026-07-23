@@ -90,8 +90,8 @@ async def get_supabase_db():
 
 
 
-print("Host:", os.getenv("SUPABASE_DB_HOST"))
-print("Port:", os.getenv("SUPABASE_DB_PORT"))
-print("User:", os.getenv("SUPABASE_DB_USER"))
-print("DB:", os.getenv("SUPABASE_DB_NAME"))
-print(SUPABASE_DATABASE_URL)
+# print("Host:", os.getenv("SUPABASE_DB_HOST"))
+# print("Port:", os.getenv("SUPABASE_DB_PORT"))
+# print("User:", os.getenv("SUPABASE_DB_USER"))
+# print("DB:", os.getenv("SUPABASE_DB_NAME"))
+# print(SUPABASE_DATABASE_URL)
