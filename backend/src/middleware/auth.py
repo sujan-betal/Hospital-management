@@ -6,15 +6,13 @@ from jose import jwt, JWTError
 import logging
 import os
 
-from src.config.database import (
-    get_local_db,
-    get_supabase_db,
-)
-# from src.models.admin_model import Admin
-# from src.models.doctor_model import Doctor              # TODO: confirm actual path/model name
-# from src.models.receptionist_model import Receptionist  # TODO: confirm actual path/model name
-# from src.models.patient_model import Patient            # TODO: confirm actual path/model name
-# from src.models.permission_model import Permission
+from src.config.database import get_db
+
+from src.models.admin_model import Admin
+from src.models.doctor_model import Doctor
+from src.models.receptionist_model import Receptionist
+from src.models.patient_model import Patient
+from src.models.permission_model import Permission
 
 
 logger = logging.getLogger(__name__)
@@ -53,7 +51,7 @@ def authorization(allowed_roles: list = None, required_permissions: list = None)
 
     async def authorize_user(
         credentials: HTTPAuthorizationCredentials = Depends(security),
-        db: AsyncSession = Depends(get_local_db if READ_DB == "local" else get_supabase_db),
+        db: AsyncSession = Depends(get_db),
     ):
         try:
             token = credentials.credentials

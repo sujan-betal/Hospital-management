@@ -21,9 +21,11 @@ import {
   UserPlus,
   Clock,
   CircleDot,
-  Lock
+  Lock,
+  AlertCircle
 } from "lucide-react"
 import { StaffCredential } from "../mockData"
+import { registerAdmin } from "@/services/auth.service"
 
 interface StaffCredentialsProps {
   credentials: StaffCredential[]
@@ -61,6 +63,8 @@ export function StaffCredentials({
   const [generatedPassword, setGeneratedPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [createError, setCreateError] = useState("")
+  const [creating, setCreating] = useState(false)
 
   // Analytics
   const totalStaff = credentials.length
@@ -90,6 +94,7 @@ export function StaffCredentials({
     setGeneratedPassword(generatePassword())
     setShowPassword(false)
     setCopied(false)
+    setCreateError("")
     setIsCreateOpen(true)
   }
 
@@ -99,30 +104,45 @@ export function StaffCredentials({
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
+    setCreateError("")
     if (!newFullName || !newEmail) return
 
-    const now = new Date()
-    const dateStr = now.toISOString().split("T")[0]
-    const prefix = newRole === "doctor" ? "D" : "R"
-    const empNum = Math.floor(100 + Math.random() * 900)
+    setCreating(true)
+    try {
+      const userName = newFullName.toLowerCase().replace(/\s+/g, "_")
+      await registerAdmin({
+        user_name: userName,
+        email: newEmail,
+        password: generatedPassword,
+      })
 
-    const newCred: StaffCredential = {
-      id: `CRED-${Math.floor(100 + Math.random() * 900)}`,
-      fullName: newRole === "doctor" ? `Dr. ${newFullName}` : newFullName,
-      role: newRole,
-      email: newEmail,
-      phone: newPhone || "+91 00000 00000",
-      department: newDepartment || (newRole === "doctor" ? "General Medicine" : "Front Desk - OPD"),
-      employeeId: `EMP-${prefix}${empNum}`,
-      status: "active",
-      createdAt: dateStr,
-      lastLogin: null
+      const now = new Date()
+      const dateStr = now.toISOString().split("T")[0]
+      const prefix = newRole === "doctor" ? "D" : "R"
+      const empNum = Math.floor(100 + Math.random() * 900)
+
+      const newCred: StaffCredential = {
+        id: `CRED-${Math.floor(100 + Math.random() * 900)}`,
+        fullName: newRole === "doctor" ? `Dr. ${newFullName}` : newFullName,
+        role: newRole,
+        email: newEmail,
+        phone: newPhone || "+91 00000 00000",
+        department: newDepartment || (newRole === "doctor" ? "General Medicine" : "Front Desk - OPD"),
+        employeeId: `EMP-${prefix}${empNum}`,
+        status: "active",
+        createdAt: dateStr,
+        lastLogin: null
+      }
+
+      onAddCredential(newCred)
+      setIsCreateOpen(false)
+    } catch (err: any) {
+      setCreateError(err.message || "Failed to create credential")
+    } finally {
+      setCreating(false)
     }
-
-    onAddCredential(newCred)
-    setIsCreateOpen(false)
   }
 
   const handleToggleStatus = (cred: StaffCredential) => {
@@ -423,6 +443,12 @@ export function StaffCredentials({
             </div>
 
             <form onSubmit={handleCreate} className="space-y-4 py-4">
+              {createError && (
+                <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-xs font-medium rounded-xl px-4 py-2.5">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  {createError}
+                </div>
+              )}
               {/* Role Selector */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-[#12463E]">Staff Role</label>
@@ -584,10 +610,14 @@ export function StaffCredentials({
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 h-11 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 shadow-md shadow-emerald-600/10 transition-all flex items-center justify-center gap-2"
+                  disabled={creating}
+                  className="flex-1 h-11 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 shadow-md shadow-emerald-600/10 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
                 >
-                  <BadgeCheck className="h-4 w-4" />
-                  Create & Activate
+                  {creating ? (
+                    <>Creating...</>
+                  ) : (
+                    <><BadgeCheck className="h-4 w-4" /> Create & Activate</>
+                  )}
                 </button>
               </div>
             </form>

@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Eye, EyeOff, Lock, Mail, LogIn } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { loginStaff } from "@/services/auth.service"
 
 export function StaffLoginForm() {
   const router = useRouter()
@@ -11,9 +12,11 @@ export function StaffLoginForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [serverError, setServerError] = useState("")
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setServerError("")
     const errs: Record<string, string> = {}
     if (!/^\S+@\S+\.\S+$/.test(email)) errs.email = "Enter a valid email address"
     if (password.length < 6) errs.password = "Password must be at least 6 characters"
@@ -21,29 +24,20 @@ export function StaffLoginForm() {
     if (Object.keys(errs).length) return
 
     setSubmitting(true)
-    await new Promise((r) => setTimeout(r, 1400))
-    setSubmitting(false)
-    
-    const emailLower = email.toLowerCase()
-    if (
-      emailLower.includes("doctor") || 
-      emailLower.includes("doc") || 
-      emailLower.includes("house") || 
-      emailLower.includes("grey") || 
-      emailLower.includes("strange") || 
-      emailLower.includes("cameron")
-    ) {
-      router.push("/doctor")
-    } else if (
-      emailLower.includes("receptionist") || 
-      emailLower.includes("recep") || 
-      emailLower.includes("priya") || 
-      emailLower.includes("rahul") || 
-      emailLower.includes("anita")
-    ) {
-      router.push("/receptionist")
-    } else {
-      router.push("/admin")
+    try {
+      const res = await loginStaff({ email, password })
+      const role = res.data.role?.toLowerCase()
+      if (role === "doctor") {
+        router.push("/doctor")
+      } else if (role === "receptionist") {
+        router.push("/receptionist")
+      } else {
+        router.push("/admin")
+      }
+    } catch (err: any) {
+      setServerError(err.message || "Login failed. Please try again.")
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -118,6 +112,12 @@ export function StaffLoginForm() {
         )}
       </div>
 
+      {serverError && (
+        <p className="text-xs text-[#C4392A] flex items-center gap-1.5 pl-0.5 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+          <span className="w-1 h-1 rounded-full bg-[#C4392A]" />
+          {serverError}
+        </p>
+      )}
 
       <button
         type="submit"

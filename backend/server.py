@@ -11,17 +11,18 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-# from src.modules.game.game_routes import router as game_router
+from src.modules.admin.admin_routes import router as admin_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("[STARTUP] Hotel Management backend running (in-memory storage for now).")
+    print("[STARTUP] Hospital Management backend running.")
     yield
     print("[SHUTDOWN] Server shutting down.")
 
 
-app = FastAPI(title="Hotel Management Backend", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Hospital Management Backend", version="1.0.0", lifespan=lifespan)
+app.include_router(admin_router)
 
 
 allowed_origins = [
