@@ -66,6 +66,17 @@ interface ConsultationHistory {
 export default function DoctorDashboard() {
   const [activeTab, setActiveTab] = useState<"schedule" | "prescriptions" | "lab-orders" | "consultations">("schedule")
   const [currentTime, setCurrentTime] = useState("")
+  const [authed, setAuthed] = useState(false)
+
+  useEffect(() => {
+    if (!localStorage.getItem("access_token")) {
+      window.location.href = "/login"
+    } else {
+      setAuthed(true)
+    }
+  }, [])
+
+  if (!authed) return null
 
   // State lists
   const [appointments, setAppointments] = useState<Appointment[]>([

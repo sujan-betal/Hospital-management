@@ -12,6 +12,22 @@ export class ApiError extends Error {
   }
 }
 
+// Backend errors come in two shapes: our own `{message}` envelope, and
+// FastAPI-native `{detail}` (auth middleware, 422 validation). Surface the
+// real reason instead of a generic "Request failed".
+function extractErrorMessage(json: any): string {
+  if (!json) return "Request failed"
+  if (json.message) return json.message
+  if (typeof json.detail === "string") return json.detail
+  if (Array.isArray(json.detail) && json.detail.length) {
+    const first = json.detail[0]
+    if (first && typeof first.msg === "string") return first.msg
+    return JSON.stringify(json.detail)
+  }
+  if (json.detail && typeof json.detail.msg === "string") return json.detail.msg
+  return "Request failed"
+}
+
 async function request<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -32,10 +48,19 @@ async function request<T>(
     headers,
   })
 
-  const json = await res.json()
+  let json: any = null
+  try {
+    json = await res.json()
+  } catch {
+    json = null
+  }
 
-  if (!res.ok || json.success === false) {
-    throw new ApiError(json.message || "Request failed", res.status, json)
+  if (!res.ok || json?.success === false) {
+    if (res.status === 401 && typeof window !== "undefined") {
+      localStorage.removeItem("access_token")
+      localStorage.removeItem("user")
+    }
+    throw new ApiError(extractErrorMessage(json), res.status, json)
   }
 
   return json

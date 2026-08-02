@@ -88,8 +88,9 @@ export const initialMedicalTasks: MedicalTask[] = [
 /* ─── Staff Credentials ─── */
 export interface StaffCredential {
   id: string
+  user_id?: string
   fullName: string
-  role: "doctor" | "receptionist"
+  role: "doctor" | "receptionist" | "subadmin" | "admin"
   email: string
   phone: string
   department: string

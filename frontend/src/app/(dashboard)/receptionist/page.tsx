@@ -56,6 +56,17 @@ interface Invoice {
 export default function ReceptionistDashboard() {
   const [activeTab, setActiveTab] = useState<"registration" | "appointments" | "billing" | "reports">("registration")
   const [currentTime, setCurrentTime] = useState("")
+  const [authed, setAuthed] = useState(false)
+
+  useEffect(() => {
+    if (!localStorage.getItem("access_token")) {
+      window.location.href = "/login"
+    } else {
+      setAuthed(true)
+    }
+  }, [])
+
+  if (!authed) return null
 
   // State variables
   const [patients, setPatients] = useState<Patient[]>([

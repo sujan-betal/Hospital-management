@@ -11,7 +11,7 @@ class Doctor(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_name = Column(String, unique=True, nullable=False)
     email = Column(String, unique=True, nullable=False) 
-    password = Column(Text, nullable=False)
+    password = Column(Text, nullable=True)
     user_id = Column(
         UUID(as_uuid=True),
         default=uuid.uuid4,
@@ -25,6 +25,26 @@ class Doctor(Base):
     role = Column(
         String,
         default="DOCTOR"
+    )
+    phone = Column(
+        String,
+        nullable=True
+    )
+    department = Column(
+        String,
+        nullable=True
+    )
+    token = Column(
+        Text, nullable=True)
+    is_reset = Column(
+        Boolean,
+        default=False,
+        server_default="false",
+        nullable=False
+    )
+    created_by = Column(
+        UUID(as_uuid=True),
+        nullable=True
     )
     created_at = Column(
         DateTime(timezone=True),

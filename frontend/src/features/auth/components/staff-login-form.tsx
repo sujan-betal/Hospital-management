@@ -3,11 +3,12 @@
 import { useState } from "react"
 import { Eye, EyeOff, Lock, Mail, LogIn } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { loginStaff } from "@/services/auth.service"
+import { useAuth } from "@/store/auth.store"
 
 export function StaffLoginForm() {
   const router = useRouter()
-  const [email, setEmail] = useState("")
+  const { login } = useAuth()
+  const [identifier, setIdentifier] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -18,15 +19,16 @@ export function StaffLoginForm() {
     e.preventDefault()
     setServerError("")
     const errs: Record<string, string> = {}
-    if (!/^\S+@\S+\.\S+$/.test(email)) errs.email = "Enter a valid email address"
+    if (identifier.trim().length < 3) errs.identifier = "Enter your username or email"
     if (password.length < 6) errs.password = "Password must be at least 6 characters"
     setErrors(errs)
     if (Object.keys(errs).length) return
 
     setSubmitting(true)
     try {
-      const res = await loginStaff({ email, password })
-      const role = res.data.role?.toLowerCase()
+      await login({ email: identifier.trim(), password })
+      const storedUser = localStorage.getItem("user")
+      const role = storedUser ? (JSON.parse(storedUser).role || "").toLowerCase() : ""
       if (role === "doctor") {
         router.push("/doctor")
       } else if (role === "receptionist") {
@@ -44,26 +46,26 @@ export function StaffLoginForm() {
   return (
     <form onSubmit={submit} className="space-y-4">
       <div className="space-y-1.5">
-        <label htmlFor="email" className="text-[13px] font-semibold text-[#12463E] tracking-wide">
-          Email address
+        <label htmlFor="identifier" className="text-[13px] font-semibold text-[#12463E] tracking-wide">
+          Username or Email
         </label>
         <div className="relative group">
           <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#6B8078] group-focus-within:text-[#12463E] transition-colors">
             <Mail className="h-4 w-4" strokeWidth={2} />
           </div>
           <input
-            id="email"
-            type="email"
-            placeholder="doctor@hospital.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            id="identifier"
+            type="text"
+            placeholder="username or doctor@hospital.com"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
             className="w-full h-12 pl-10 pr-3 rounded-xl border border-[#D7E2DC] bg-[#F6F8F7] text-sm text-[#0B2B26] placeholder:text-[#9CAEA6] focus:outline-none focus:ring-2 focus:ring-[#12463E]/20 focus:border-[#12463E] transition-all"
           />
         </div>
-        {errors.email && (
+        {errors.identifier && (
           <p className="text-xs text-[#C4392A] flex items-center gap-1.5 pl-0.5">
             <span className="w-1 h-1 rounded-full bg-[#C4392A]" />
-            {errors.email}
+            {errors.identifier}
           </p>
         )}
       </div>

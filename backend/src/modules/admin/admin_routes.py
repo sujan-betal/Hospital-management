@@ -1,10 +1,27 @@
 
+import uuid as uuid_lib
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config.database import get_db
-from src.modules.admin.admin_schema import AdminRegisterRequest, AdminLoginRequest
-from src.modules.admin.admin_service import register_admin_service, login_admin_service
+from src.middleware.auth import authorization
+from src.modules.admin.admin_schema import (
+    AdminLoginRequest,
+    AdminRegisterRequest,
+    PermissionAssignRequest,
+    StaffUpdateRequest,
+    SubAdminCreateRequest,
+)
+from src.modules.admin.admin_service import (
+    assign_permissions_service,
+    create_subadmin_service,
+    delete_staff_service,
+    list_staff_service,
+    login_staff_service,
+    register_admin_service,
+    update_staff_service,
+)
 
 router = APIRouter(prefix="/api/admin", tags=["Admin Authentication"])
 
@@ -20,4 +37,44 @@ async def login_admin(
     payload: AdminLoginRequest,
     db: AsyncSession = Depends(get_db)
 ):
-    return await login_admin_service(payload, db)
+    return await login_staff_service(payload, db)
+
+@router.post("/subadmins")
+async def create_subadmin(
+    payload: SubAdminCreateRequest,
+    admin=Depends(authorization(allowed_roles=["ADMIN"])),
+    db: AsyncSession = Depends(get_db),
+):
+    return await create_subadmin_service(payload, admin.user_id, db)
+
+@router.put("/permissions")
+async def assign_permissions(
+    payload: PermissionAssignRequest,
+    admin=Depends(authorization(allowed_roles=["ADMIN"])),
+    db: AsyncSession = Depends(get_db),
+):
+    return await assign_permissions_service(payload, db)
+
+@router.get("/staff")
+async def list_staff(
+    admin=Depends(authorization(allowed_roles=["ADMIN", "SUBADMIN"])),
+    db: AsyncSession = Depends(get_db),
+):
+    return await list_staff_service(db)
+
+@router.put("/staff/{user_id}")
+async def update_staff(
+    user_id: uuid_lib.UUID,
+    payload: StaffUpdateRequest,
+    admin=Depends(authorization(allowed_roles=["ADMIN"])),
+    db: AsyncSession = Depends(get_db),
+):
+    return await update_staff_service(user_id, payload, db)
+
+@router.delete("/staff/{user_id}")
+async def delete_staff(
+    user_id: uuid_lib.UUID,
+    admin=Depends(authorization(allowed_roles=["ADMIN"])),
+    db: AsyncSession = Depends(get_db),
+):
+    return await delete_staff_service(user_id, admin, db)

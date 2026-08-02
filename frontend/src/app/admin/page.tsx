@@ -10,6 +10,7 @@ import { AttendingDoctors } from "./components/AttendingDoctors"
 import { ClinicalTasks } from "./components/ClinicalTasks"
 import { StaffCredentials } from "./components/StaffCredentials"
 import { HospitalSettings } from "./components/HospitalSettings"
+import RequireAuth from "@/components/RequireAuth"
 import {
   initialBeds,
   initialAdmissions,
@@ -175,6 +176,7 @@ export default function AdminDashboard() {
             credentials={staffCredentials}
             onAddCredential={(cred) => setStaffCredentials([cred, ...staffCredentials])}
             onUpdateCredential={(cred) => setStaffCredentials(staffCredentials.map(c => c.id === cred.id ? cred : c))}
+            onDeleteCredential={(id) => setStaffCredentials(staffCredentials.filter(c => c.id !== id))}
           />
         )
       case "settings":
@@ -200,20 +202,22 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F6F8F7]">
-      {/* Sidebar navigation panel */}
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+    <RequireAuth>
+      <div className="flex min-h-screen bg-[#F6F8F7]">
+        {/* Sidebar navigation panel */}
+        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      {/* Main Workspace */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Navbar */}
-        <Navbar activeTab={activeTab} />
+        {/* Main Workspace */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Top Navbar */}
+          <Navbar activeTab={activeTab} />
 
-        {/* Tab content wrapper */}
-        <main className="flex-1 p-8 overflow-y-auto max-w-[1600px] w-full mx-auto">
-          {renderActiveView()}
-        </main>
+          {/* Tab content wrapper */}
+          <main className="flex-1 p-8 overflow-y-auto max-w-[1600px] w-full mx-auto">
+            {renderActiveView()}
+          </main>
+        </div>
       </div>
-    </div>
+    </RequireAuth>
   )
 }
