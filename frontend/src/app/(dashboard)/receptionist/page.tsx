@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import {
   Users,
   Calendar,
@@ -18,8 +18,21 @@ import {
   Phone,
   Mail,
   Shield,
-  HeartPulse
 } from "lucide-react"
+import {
+  listPatients,
+  registerPatient,
+  listDoctors,
+  listAppointments,
+  bookAppointment,
+  updateAppointment,
+  listInvoices,
+  createInvoice,
+  updateInvoice,
+  getDashboard,
+  type DoctorOption,
+  type DashboardStats,
+} from "@/services/receptionist.service"
 
 // Types & Mock Data for Receptionist Panel
 interface Patient {
@@ -66,47 +79,69 @@ export default function ReceptionistDashboard() {
     }
   }, [])
 
-  // State variables
-  const [patients, setPatients] = useState<Patient[]>([
-    { id: "PAT-301", name: "Emma Watson", age: 32, gender: "Female", phone: "+1 (555) 019-2834", email: "emma.watson@gmail.com", insuranceProvider: "BlueCross Health", registeredAt: "2026-07-15" },
-    { id: "PAT-302", name: "Liam Neeson", age: 68, gender: "Male", phone: "+44 7911 123456", email: "liam@taken.com", insuranceProvider: "Aetna Premium", registeredAt: "2026-07-19" },
-    { id: "PAT-303", name: "Robert Downey Jr.", age: 55, gender: "Male", phone: "+1 (555) 300-3000", email: "rdj@stark.com", insuranceProvider: "Star Health Assurance", registeredAt: "2026-07-17" },
-  ])
+  // State variables (fetched from the receptionist API)
+  const [loading, setLoading] = useState(true)
+  const [patients, setPatients] = useState<Patient[]>([])
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [doctors, setDoctors] = useState<DoctorOption[]>([])
+  const [dashboard, setDashboard] = useState<DashboardStats | null>(null)
 
-  const [appointments, setAppointments] = useState<Appointment[]>([
-    { id: "APT-901", patientName: "Emma Watson", doctorName: "Dr. Gregory House", specialty: "General Medicine", date: "2026-07-20", time: "10:15 AM", status: "checked-in" },
-    { id: "APT-902", patientName: "Liam Neeson", doctorName: "Dr. Stephen Strange", specialty: "Cardiology", date: "2026-07-20", time: "11:00 AM", status: "scheduled" },
-    { id: "APT-903", patientName: "Robert Downey Jr.", doctorName: "Dr. Gregory House", specialty: "General Medicine", date: "2026-07-20", time: "09:30 AM", status: "checked-in" },
-    { id: "APT-904", patientName: "Scarlett Johansson", doctorName: "Dr. Allison Cameron", specialty: "Pediatrics", date: "2026-07-20", time: "11:45 AM", status: "scheduled" },
-  ])
+  useEffect(() => {
+    let active = true
+    async function load() {
+      try {
+        const [pRes, aRes, iRes, dRes, dashRes] = await Promise.all([
+          listPatients(),
+          listAppointments(),
+          listInvoices(),
+          listDoctors(),
+          getDashboard(),
+        ])
+        if (!active) return
 
-  const [invoices, setInvoices] = useState<Invoice[]>([
-    {
-      id: "INV-401",
-      patientName: "Robert Downey Jr.",
-      date: "2026-07-20",
-      amount: 850,
-      items: [
-        { description: "General Consultation (OPD)", cost: 150 },
-        { description: "ECG Diagnostic Scan", cost: 300 },
-        { description: "Cardiology Telemetry Hookup", cost: 400 }
-      ],
-      insuranceStatus: "covered",
-      paymentStatus: "paid"
-    },
-    {
-      id: "INV-402",
-      patientName: "Emma Watson",
-      date: "2026-07-20",
-      amount: 450,
-      items: [
-        { description: "General Consultation (OPD)", cost: 150 },
-        { description: "CBC Blood Panel", cost: 300 }
-      ],
-      insuranceStatus: "pending",
-      paymentStatus: "unpaid"
+        setPatients(pRes.data.map((p) => ({
+          id: `PAT-${String(p.id).padStart(3, "0")}`,
+          name: p.name,
+          age: p.age ?? 30,
+          gender: (p.gender || "Male") as Patient["gender"],
+          phone: p.phone,
+          email: p.email || "no-email@aura.org",
+          insuranceProvider: p.insurance_provider,
+          registeredAt: p.created_at ? p.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
+        })))
+
+        setAppointments(aRes.data.map((a) => ({
+          id: a.appointment_id,
+          patientName: a.patient_name,
+          doctorName: a.doctor_name,
+          specialty: a.specialty,
+          date: a.date,
+          time: a.time,
+          status: a.status.toLowerCase() as Appointment["status"],
+        })))
+
+        setInvoices(iRes.data.map((inv) => ({
+          id: inv.invoice_id,
+          patientName: inv.patient_name,
+          date: inv.date,
+          amount: inv.amount,
+          items: inv.items,
+          insuranceStatus: inv.insurance_status.toLowerCase() as Invoice["insuranceStatus"],
+          paymentStatus: inv.payment_status.toLowerCase() as Invoice["paymentStatus"],
+        })))
+
+        setDoctors(dRes.data)
+        setDashboard(dashRes.data)
+      } catch (err: any) {
+        console.error("Failed to load receptionist data", err)
+      } finally {
+        if (active) setLoading(false)
+      }
     }
-  ])
+    load()
+    return () => { active = false }
+  }, [])
 
   // Modals & form submissions states
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
@@ -148,43 +183,71 @@ export default function ReceptionistDashboard() {
   }, [])
 
   // Handlers
-  const handleRegisterPatient = (e: React.FormEvent) => {
+  const handleRegisterPatient = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newPatient.name || !newPatient.phone) return
 
-    const created: Patient = {
-      id: `PAT-${Math.floor(300 + Math.random() * 700)}`,
-      name: newPatient.name,
-      age: Number(newPatient.age) || 30,
-      gender: newPatient.gender,
-      phone: newPatient.phone,
-      email: newPatient.email || "no-email@aura.org",
-      insuranceProvider: newPatient.insuranceProvider || "Self-Pay / None",
-      registeredAt: new Date().toISOString().split("T")[0]
-    }
+    try {
+      const res = await registerPatient({
+        user_name: newPatient.name,
+        phone: newPatient.phone,
+        email: newPatient.email || undefined,
+        age: Number(newPatient.age) || null,
+        gender: newPatient.gender,
+        insurance_provider: newPatient.insuranceProvider || null,
+      })
 
-    setPatients([created, ...patients])
-    setNewPatient({ name: "", age: "", gender: "Male", phone: "", email: "", insuranceProvider: "" })
-    setIsRegisterOpen(false)
+      const created: Patient = {
+        id: `PAT-${String(res.data.id).padStart(3, "0")}`,
+        name: res.data.name,
+        age: res.data.age ?? 30,
+        gender: (res.data.gender || "Male") as Patient["gender"],
+        phone: res.data.phone,
+        email: res.data.email || "no-email@aura.org",
+        insuranceProvider: res.data.insurance_provider,
+        registeredAt: new Date().toISOString().split("T")[0]
+      }
+
+      setPatients([created, ...patients])
+      setNewPatient({ name: "", age: "", gender: "Male", phone: "", email: "", insuranceProvider: "" })
+      setIsRegisterOpen(false)
+    } catch (err: any) {
+      alert(err.message || "Failed to register patient")
+    }
   }
 
-  const handleBookAppointment = (e: React.FormEvent) => {
+  const handleBookAppointment = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newAppt.patientName || !newAppt.doctorName || !newAppt.time) return
 
-    const created: Appointment = {
-      id: `APT-${Math.floor(900 + Math.random() * 100)}`,
-      patientName: newAppt.patientName,
-      doctorName: newAppt.doctorName,
-      specialty: newAppt.specialty,
-      date: newAppt.date || new Date().toISOString().split("T")[0],
-      time: newAppt.time,
-      status: "scheduled"
-    }
+    try {
+      const selectedPatient = patients.find(p => p.name === newAppt.patientName)
+      const res = await bookAppointment({
+        patient_name: newAppt.patientName,
+        patient_phone: selectedPatient?.phone,
+        doctor_name: newAppt.doctorName,
+        specialty: newAppt.specialty,
+        date: newAppt.date || new Date().toISOString().split("T")[0],
+        time: newAppt.time,
+        status: "SCHEDULED",
+      })
 
-    setAppointments([created, ...appointments])
-    setNewAppt({ patientName: "", doctorName: "", specialty: "General Medicine", time: "", date: "" })
-    setIsBookOpen(false)
+      const created: Appointment = {
+        id: res.data.appointment_id,
+        patientName: res.data.patient_name,
+        doctorName: res.data.doctor_name,
+        specialty: res.data.specialty,
+        date: res.data.date,
+        time: res.data.time,
+        status: "scheduled"
+      }
+
+      setAppointments([created, ...appointments])
+      setNewAppt({ patientName: "", doctorName: "", specialty: "General Medicine", time: "", date: "" })
+      setIsBookOpen(false)
+    } catch (err: any) {
+      alert(err.message || "Failed to book appointment")
+    }
   }
 
   const handleAddInvoiceItem = () => {
@@ -200,33 +263,56 @@ export default function ReceptionistDashboard() {
     setNewInvoice({ ...newInvoice, items: updated })
   }
 
-  const handleCreateInvoice = (e: React.FormEvent) => {
+  const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newInvoice.patientName || !newInvoice.items[0].description) return
 
-    const totalAmount = newInvoice.items.reduce((sum, item) => sum + (Number(item.cost) || 0), 0)
+    const items = newInvoice.items
+      .filter(item => item.description !== "")
+      .map(item => ({ description: item.description, cost: Number(item.cost) || 0 }))
 
-    const created: Invoice = {
-      id: `INV-${Math.floor(400 + Math.random() * 600)}`,
-      patientName: newInvoice.patientName,
-      date: new Date().toISOString().split("T")[0],
-      amount: totalAmount,
-      items: newInvoice.items.filter(item => item.description !== ""),
-      insuranceStatus: newInvoice.insuranceStatus,
-      paymentStatus: "unpaid"
+    try {
+      const res = await createInvoice({
+        patient_name: newInvoice.patientName,
+        date: new Date().toISOString().split("T")[0],
+        items,
+        insurance_status: newInvoice.insuranceStatus.toUpperCase(),
+      })
+
+      const created: Invoice = {
+        id: res.data.invoice_id,
+        patientName: res.data.patient_name,
+        date: res.data.date,
+        amount: res.data.amount,
+        items: res.data.items,
+        insuranceStatus: res.data.insurance_status.toLowerCase() as Invoice["insuranceStatus"],
+        paymentStatus: "unpaid"
+      }
+
+      setInvoices([created, ...invoices])
+      setNewInvoice({ patientName: "", insuranceStatus: "uninsured", items: [{ description: "", cost: 0 }] })
+      setIsInvoiceOpen(false)
+    } catch (err: any) {
+      alert(err.message || "Failed to create invoice")
     }
-
-    setInvoices([created, ...invoices])
-    setNewInvoice({ patientName: "", insuranceStatus: "uninsured", items: [{ description: "", cost: 0 }] })
-    setIsInvoiceOpen(false)
   }
 
-  const handleMarkAsPaid = (id: string) => {
-    setInvoices(invoices.map(inv => inv.id === id ? { ...inv, paymentStatus: "paid" as const } : inv))
+  const handleMarkAsPaid = async (id: string) => {
+    try {
+      await updateInvoice(id, { payment_status: "PAID" })
+      setInvoices(invoices.map(inv => inv.id === id ? { ...inv, paymentStatus: "paid" as const } : inv))
+    } catch (err: any) {
+      alert(err.message || "Failed to mark invoice as paid")
+    }
   }
 
-  const handleCheckIn = (id: string) => {
-    setAppointments(appointments.map(a => a.id === id ? { ...a, status: "checked-in" as const } : a))
+  const handleCheckIn = async (id: string) => {
+    try {
+      await updateAppointment(id, { status: "CHECKED-IN" })
+      setAppointments(appointments.map(a => a.id === id ? { ...a, status: "checked-in" as const } : a))
+    } catch (err: any) {
+      alert(err.message || "Failed to check in patient")
+    }
   }
 
   // Filtered patients search
@@ -236,7 +322,30 @@ export default function ReceptionistDashboard() {
     p.id.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  // OPD specialty distribution for the analytics tab
+  const specialtyBreakdown = useMemo(() => {
+    const counts: Record<string, number> = {}
+    appointments.forEach(a => {
+      counts[a.specialty] = (counts[a.specialty] || 0) + 1
+    })
+    const entries = Object.entries(counts).map(([name, count]) => ({ name, count }))
+    entries.sort((a, b) => b.count - a.count)
+    return entries
+  }, [appointments])
+
+  const maxSpecialty = specialtyBreakdown.length
+    ? Math.max(...specialtyBreakdown.map(s => s.count))
+    : 0
+
   if (!authed) return null
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F6F8F7] text-[#0B2B26]">
+        <div className="text-sm font-semibold text-[#12463E] animate-pulse">Loading desk console...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex min-h-screen bg-[#F6F8F7] text-[#0B2B26]">
@@ -566,9 +675,9 @@ export default function ReceptionistDashboard() {
                 <div className="bg-white p-6 rounded-3xl border border-[#E8ECEB] shadow-xs flex items-center justify-between">
                   <div>
                     <h4 className="text-xs font-semibold text-[#8AA098] uppercase tracking-wider">Today's Visits</h4>
-                    <p className="text-3xl font-black text-[#0B2B26] mt-2">42</p>
+                    <p className="text-3xl font-black text-[#0B2B26] mt-2">{dashboard?.today_visits ?? "—"}</p>
                     <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-0.5 mt-1">
-                      <TrendingUp className="h-3 w-3" /> +12% from yesterday
+                      <TrendingUp className="h-3 w-3" /> {dashboard?.checked_in_today ?? 0} checked in today
                     </span>
                   </div>
                   <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl">
@@ -579,9 +688,9 @@ export default function ReceptionistDashboard() {
                 <div className="bg-white p-6 rounded-3xl border border-[#E8ECEB] shadow-xs flex items-center justify-between">
                   <div>
                     <h4 className="text-xs font-semibold text-[#8AA098] uppercase tracking-wider">Net Billings</h4>
-                    <p className="text-3xl font-black text-[#0B2B26] mt-2">Rs. 3,420</p>
+                    <p className="text-3xl font-black text-[#0B2B26] mt-2">Rs. {(dashboard?.paid_billings ?? 0).toLocaleString()}</p>
                     <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-0.5 mt-1">
-                      <TrendingUp className="h-3 w-3" /> +22% from target
+                      <TrendingUp className="h-3 w-3" /> {dashboard?.unpaid_invoices ?? 0} unpaid invoices
                     </span>
                   </div>
                   <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl">
@@ -591,10 +700,10 @@ export default function ReceptionistDashboard() {
 
                 <div className="bg-white p-6 rounded-3xl border border-[#E8ECEB] shadow-xs flex items-center justify-between">
                   <div>
-                    <h4 className="text-xs font-semibold text-[#8AA098] uppercase tracking-wider">Avg Wait Time</h4>
-                    <p className="text-3xl font-black text-[#0B2B26] mt-2">14 mins</p>
+                    <h4 className="text-xs font-semibold text-[#8AA098] uppercase tracking-wider">Unpaid Billings</h4>
+                    <p className="text-3xl font-black text-[#0B2B26] mt-2">Rs. {(dashboard?.unpaid_billings ?? 0).toLocaleString()}</p>
                     <span className="text-[10px] text-rose-600 font-bold flex items-center gap-0.5 mt-1">
-                      <TrendingDown className="h-3 w-3" /> -4 mins from last wk
+                      <TrendingDown className="h-3 w-3" /> Pending collections
                     </span>
                   </div>
                   <div className="p-4 bg-rose-50 text-rose-600 rounded-2xl">
@@ -605,9 +714,9 @@ export default function ReceptionistDashboard() {
                 <div className="bg-white p-6 rounded-3xl border border-[#E8ECEB] shadow-xs flex items-center justify-between">
                   <div>
                     <h4 className="text-xs font-semibold text-[#8AA098] uppercase tracking-wider">Ward Occupancy</h4>
-                    <p className="text-3xl font-black text-[#0B2B26] mt-2">78%</p>
+                    <p className="text-3xl font-black text-[#0B2B26] mt-2">{dashboard?.occupancy_rate ?? 0}%</p>
                     <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-0.5 mt-1">
-                      <CheckCircle className="h-3 w-3" /> Optimum capacity
+                      <CheckCircle className="h-3 w-3" /> {dashboard?.occupied_beds ?? 0}/{dashboard?.total_beds ?? 0} beds
                     </span>
                   </div>
                   <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl">
@@ -623,45 +732,23 @@ export default function ReceptionistDashboard() {
                   <p className="text-xs text-[#8AA098] mt-1">Total distribution of OPD schedules across departments today</p>
 
                   <div className="space-y-4 mt-6">
-                    <div>
-                      <div className="flex justify-between text-xs font-semibold mb-1.5">
-                        <span>General Medicine (OPD)</span>
-                        <span className="font-mono">18 / 25 Slots</span>
-                      </div>
-                      <div className="h-2.5 bg-[#EEF4F1] rounded-full overflow-hidden">
-                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: "72%" }} />
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between text-xs font-semibold mb-1.5">
-                        <span>Cardiology Telemetry Clinics</span>
-                        <span className="font-mono">8 / 12 Slots</span>
-                      </div>
-                      <div className="h-2.5 bg-[#EEF4F1] rounded-full overflow-hidden">
-                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: "66%" }} />
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between text-xs font-semibold mb-1.5">
-                        <span>Pediatrics & Immunization</span>
-                        <span className="font-mono">12 / 15 Slots</span>
-                      </div>
-                      <div className="h-2.5 bg-[#EEF4F1] rounded-full overflow-hidden">
-                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: "80%" }} />
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between text-xs font-semibold mb-1.5">
-                        <span>Neurology Consultations</span>
-                        <span className="font-mono">4 / 8 Slots</span>
-                      </div>
-                      <div className="h-2.5 bg-[#EEF4F1] rounded-full overflow-hidden">
-                        <div className="h-full bg-emerald-500 rounded-full" style={{ width: "50%" }} />
-                      </div>
-                    </div>
+                    {specialtyBreakdown.length === 0 && (
+                      <p className="text-xs text-[#8AA098]">No OPD appointments booked yet.</p>
+                    )}
+                    {specialtyBreakdown.map((s) => {
+                      const pct = maxSpecialty ? Math.round((s.count / maxSpecialty) * 100) : 0
+                      return (
+                        <div key={s.name}>
+                          <div className="flex justify-between text-xs font-semibold mb-1.5">
+                            <span>{s.name}</span>
+                            <span className="font-mono">{s.count} / {maxSpecialty} Slots</span>
+                          </div>
+                          <div className="h-2.5 bg-[#EEF4F1] rounded-full overflow-hidden">
+                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
 
@@ -846,26 +933,20 @@ export default function ReceptionistDashboard() {
                 <select
                   value={newAppt.doctorName}
                   onChange={(e) => {
-                    const docs = {
-                      "Dr. Gregory House": "General Medicine",
-                      "Dr. Stephen Strange": "Cardiology",
-                      "Dr. Meredith Grey": "Neurology",
-                      "Dr. Allison Cameron": "Pediatrics"
-                    }
+                    const selected = doctors.find(d => d.name === e.target.value)
                     setNewAppt({
                       ...newAppt,
                       doctorName: e.target.value,
-                      specialty: docs[e.target.value as keyof typeof docs] || "General Medicine"
+                      specialty: selected?.specialty || "General Medicine"
                     })
                   }}
                   className="w-full bg-[#F6F8F7] border border-[#D7E2DC] rounded-xl px-4 py-3 text-sm text-[#0B2B26] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                   required
                 >
                   <option value="">-- Choose practitioner --</option>
-                  <option value="Dr. Gregory House">Dr. Gregory House (General Medicine)</option>
-                  <option value="Dr. Stephen Strange">Dr. Stephen Strange (Cardiology)</option>
-                  <option value="Dr. Meredith Grey">Dr. Meredith Grey (Neurology)</option>
-                  <option value="Dr. Allison Cameron">Dr. Allison Cameron (Pediatrics)</option>
+                  {doctors.map(doc => (
+                    <option key={doc.user_id} value={doc.name}>{doc.name} ({doc.specialty})</option>
+                  ))}
                 </select>
               </div>
 

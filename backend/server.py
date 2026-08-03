@@ -15,6 +15,7 @@ import uvicorn
 from src.modules.admin.admin_routes import router as admin_router
 from src.modules.doctor.doctor_routes import router as doctor_router
 from src.modules.hospital.hospital_routes import router as hospital_router
+from src.modules.receptionist.receptionist_routes import router as receptionist_router
 
 
 async def ensure_schema():
@@ -32,6 +33,8 @@ async def ensure_schema():
     from src.models.admission_model import Admission  # noqa: F401
     from src.models.task_model import ClinicalTask  # noqa: F401
     from src.models.hospital_setting_model import HospitalSetting  # noqa: F401
+    from src.models.opd_appointment_model import OpdAppointment  # noqa: F401
+    from src.models.invoice_model import Invoice  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -42,6 +45,9 @@ async def ensure_schema():
         "ALTER TABLE doctors ADD COLUMN IF NOT EXISTS token TEXT",
         "ALTER TABLE doctors ADD COLUMN IF NOT EXISTS is_reset BOOLEAN DEFAULT FALSE",
         "ALTER TABLE doctors ADD COLUMN IF NOT EXISTS created_by UUID",
+        "ALTER TABLE patients ADD COLUMN IF NOT EXISTS age INTEGER",
+        "ALTER TABLE patients ADD COLUMN IF NOT EXISTS gender VARCHAR",
+        "ALTER TABLE patients ADD COLUMN IF NOT EXISTS insurance_provider VARCHAR",
     ]
     async with engine.begin() as conn:
         for statement in statements:
@@ -91,6 +97,42 @@ async def seed_hospital_data():
         await db.commit()
 
 
+async def seed_receptionist_data():
+    """Insert demo patients/appointments/invoices only when empty."""
+    from sqlalchemy import func, select
+
+    from src.config.database import SessionLocal
+    from src.models.invoice_model import Invoice
+    from src.models.opd_appointment_model import OpdAppointment
+    from src.models.patient_model import Patient
+    from src.modules.receptionist.seed_data import (
+        SEED_APPOINTMENTS,
+        SEED_INVOICES,
+        SEED_PATIENTS,
+    )
+
+    async with SessionLocal() as db:
+        if (
+            await db.execute(select(func.count()).select_from(Patient))
+        ).scalar_one() == 0:
+            for row in SEED_PATIENTS:
+                db.add(Patient(**row))
+
+        if (
+            await db.execute(select(func.count()).select_from(OpdAppointment))
+        ).scalar_one() == 0:
+            for row in SEED_APPOINTMENTS:
+                db.add(OpdAppointment(**row))
+
+        if (
+            await db.execute(select(func.count()).select_from(Invoice))
+        ).scalar_one() == 0:
+            for row in SEED_INVOICES:
+                db.add(Invoice(**row))
+
+        await db.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("[STARTUP] Hospital Management backend running.")
@@ -99,6 +141,8 @@ async def lifespan(app: FastAPI):
         print("[STARTUP] Schema up to date (all tables present).")
         await seed_hospital_data()
         print("[STARTUP] Demo hospital data seeded (if tables were empty).")
+        await seed_receptionist_data()
+        print("[STARTUP] Demo receptionist data seeded (if tables were empty).")
     except Exception as exc:  # pragma: no cover - defensive startup
         print(f"[STARTUP] WARNING: could not ensure schema: {exc}")
     yield
@@ -109,6 +153,7 @@ app = FastAPI(title="Hospital Management Backend", version="1.0.0", lifespan=lif
 app.include_router(admin_router)
 app.include_router(doctor_router)
 app.include_router(hospital_router)
+app.include_router(receptionist_router)
 
 
 allowed_origins = [

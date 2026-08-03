@@ -13,6 +13,9 @@ class Patient(Base):
     email = Column(String, unique=True, nullable=True) 
     phone = Column(String, unique=True, nullable=False)
     password = Column(Text, nullable=True)
+    age = Column(Integer, nullable=True)
+    gender = Column(String, nullable=True)
+    insurance_provider = Column(String, nullable=True)
     user_id = Column(
         UUID(as_uuid=True),
         default=uuid.uuid4,
