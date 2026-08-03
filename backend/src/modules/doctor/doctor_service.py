@@ -1,4 +1,5 @@
 import os
+import uuid
 from datetime import timedelta
 
 from jose import jwt, JWTError
@@ -82,10 +83,14 @@ async def create_doctor_service(
             created_by=created_by,
         )
 
+        db.add(doctor)
+        await db.commit()
+        await db.refresh(doctor)
+
+        # user_id is only assigned after commit, so build the reset token now
+        # to avoid embedding "None" as the UUID in the emailed link.
         reset_token = _create_reset_token(doctor.user_id, "DOCTOR")
         doctor.token = reset_token
-
-        db.add(doctor)
         await db.commit()
         await db.refresh(doctor)
 
@@ -95,6 +100,8 @@ async def create_doctor_service(
             full_name=doctor.user_name,
             reset_link=reset_link,
             reset_minutes=RESET_TOKEN_EXPIRE_MINUTES,
+            login_email=doctor.email,
+            login_username=doctor.user_name,
         )
 
         message = (
@@ -257,9 +264,11 @@ async def reset_password_service(payload, db: AsyncSession):
             )
 
         user_id = decoded.get("user_id")
-        if not user_id:
+        try:
+            user_uuid = uuid.UUID(str(user_id))
+        except (TypeError, ValueError):
             return api_response_error(
-                message="Invalid reset link.",
+                message="Invalid or expired reset link.",
                 status_code=StatusCode.badRequest,
             )
 
@@ -268,12 +277,12 @@ async def reset_password_service(payload, db: AsyncSession):
 
         if role == "DOCTOR":
             result = await db.execute(
-                select(Doctor).where(Doctor.user_id == user_id)
+                select(Doctor).where(Doctor.user_id == user_uuid)
             )
             account = result.scalar_one_or_none()
         elif role in ("ADMIN", "SUBADMIN"):
             result = await db.execute(
-                select(Admin).where(Admin.user_id == user_id)
+                select(Admin).where(Admin.user_id == user_uuid)
             )
             account = result.scalar_one_or_none()
 

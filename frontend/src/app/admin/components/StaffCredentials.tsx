@@ -119,6 +119,7 @@ export function StaffCredentials({
   const [newPhone, setNewPhone] = useState("")
   const [newDepartment, setNewDepartment] = useState("")
   const [newPermissions, setNewPermissions] = useState("")
+  const [newUserName, setNewUserName] = useState("")
   const [generatedPassword, setGeneratedPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -187,11 +188,20 @@ export function StaffCredentials({
     setNewPhone("")
     setNewDepartment("")
     setNewPermissions("")
+    setNewUserName("")
     setGeneratedPassword(generatePassword())
     setShowPassword(false)
     setCopied(false)
     setCreateError("")
     setIsCreateOpen(true)
+  }
+
+  const deriveUserName = (name: string) =>
+    name.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_.-]/g, "")
+
+  const handleFullNameChange = (value: string) => {
+    setNewFullName(value)
+    setNewUserName(deriveUserName(value))
   }
 
   const handleCopyPassword = () => {
@@ -207,7 +217,7 @@ export function StaffCredentials({
 
     setCreating(true)
     try {
-      const userName = newFullName.toLowerCase().replace(/\s+/g, "_")
+      const userName = newUserName || deriveUserName(newFullName)
       let createdUserId: string | undefined
 
       if (newRole === "doctor") {
@@ -837,7 +847,7 @@ export function StaffCredentials({
                     required
                     placeholder={newRole === "doctor" ? "e.g. Rajesh Kumar" : "e.g. Priya Patel"}
                     value={newFullName}
-                    onChange={(e) => setNewFullName(e.target.value)}
+                    onChange={(e) => handleFullNameChange(e.target.value)}
                     className="w-full h-11 px-3.5 rounded-xl border border-[#D7E2DC] bg-[#F6F8F7] text-xs text-[#0B2B26] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                   />
                 </div>
@@ -853,6 +863,25 @@ export function StaffCredentials({
                     className="w-full h-11 px-3.5 rounded-xl border border-[#D7E2DC] bg-[#F6F8F7] text-xs text-[#0B2B26] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                   />
                 </div>
+              </div>
+
+              {/* Username (auto-generated, editable) */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-[#12463E] flex items-center gap-1.5">
+                  Login Username
+                  <span className="text-[10px] font-normal text-[#8AA098]">(auto-generated from full name, editable)</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. rajesh_kumar"
+                  value={newUserName}
+                  onChange={(e) => setNewUserName(e.target.value.toLowerCase().replace(/\s+/g, "_"))}
+                  className="w-full h-11 px-3.5 rounded-xl border border-emerald-200 bg-emerald-50/50 text-xs font-mono text-[#0B2B26] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                />
+                <p className="text-[10px] text-[#8AA098]">
+                  The staff member signs in with this username (or their email) and the password they set via the emailed link.
+                </p>
               </div>
 
               {/* Phone & Department */}

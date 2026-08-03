@@ -69,9 +69,24 @@ def send_password_reset_email(
     full_name: str,
     reset_link: str,
     reset_minutes: int = 30,
+    login_email: str = None,
+    login_username: str = None,
 ) -> bool:
     """Send a 'set your password' / 'reset password' email."""
     subject = "AURA Medical - Set Up Your Account Password"
+    login_block = ""
+    if login_email or login_username:
+        login_block = f"""
+        <div style="background:#f4f9f7;border:1px solid #d7e6df;border-radius:12px;padding:16px 18px;margin:0 0 18px;">
+          <p style="margin:0 0 8px;color:#12463e;font-size:13px;font-weight:bold;">Your Login Details</p>
+          <p style="margin:0;color:#405a52;font-size:13px;line-height:1.6;">
+            Username: <strong style="color:#0f9d76;">{login_username or "—"}</strong>
+          </p>
+          <p style="margin:4px 0 0;color:#405a52;font-size:13px;line-height:1.6;">
+            Email: <strong style="color:#0f9d76;">{login_email or "—"}</strong>
+          </p>
+        </div>
+        """
     html_body = f"""
     <div style="font-family:Arial,sans-serif;background:#f4f6f5;padding:32px 16px;">
       <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;
@@ -89,6 +104,7 @@ def send_password_reset_email(
             please create a new password using the link below. The link is valid for
             the next <strong>{reset_minutes} minutes</strong>.
           </p>
+          {login_block}
           <a href="{reset_link}"
              style="display:inline-block;background:#0f9d76;color:#ffffff;text-decoration:none;
                     padding:12px 24px;border-radius:10px;font-size:14px;font-weight:bold;">

@@ -76,8 +76,6 @@ export default function DoctorDashboard() {
     }
   }, [])
 
-  if (!authed) return null
-
   // State lists
   const [appointments, setAppointments] = useState<Appointment[]>([
     { id: "APT-101", patientName: "Robert Downey Jr.", age: 55, gender: "Male", time: "09:30 AM", type: "Follow-up", symptoms: "Recovering from hypertension, BP follow-up", status: "waiting" },
@@ -223,6 +221,8 @@ export default function DoctorDashboard() {
     setNewConsultation({ patientName: "", diagnosis: "", treatmentPlan: "", notes: "" })
     setIsConsultationModalOpen(false)
   }
+
+  if (!authed) return null
 
   return (
     <div className="flex min-h-screen bg-[#050E0C] text-[#E5ECE9]">

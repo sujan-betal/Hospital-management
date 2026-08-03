@@ -66,8 +66,6 @@ export default function ReceptionistDashboard() {
     }
   }, [])
 
-  if (!authed) return null
-
   // State variables
   const [patients, setPatients] = useState<Patient[]>([
     { id: "PAT-301", name: "Emma Watson", age: 32, gender: "Female", phone: "+1 (555) 019-2834", email: "emma.watson@gmail.com", insuranceProvider: "BlueCross Health", registeredAt: "2026-07-15" },
@@ -237,6 +235,8 @@ export default function ReceptionistDashboard() {
     p.phone.includes(searchTerm) ||
     p.id.toLowerCase().includes(searchTerm.toLowerCase())
   )
+
+  if (!authed) return null
 
   return (
     <div className="flex min-h-screen bg-[#F6F8F7] text-[#0B2B26]">
