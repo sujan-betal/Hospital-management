@@ -12,6 +12,26 @@ from src.modules.admin.admin_helper import format_admin_data
 
 VALID_STATUSES = {"ACTIVE", "SUSPENDED", "INACTIVE"}
 
+SHIFT_STATUS_MAP = {
+    "ACTIVE": "On Duty",
+    "SUSPENDED": "On Call",
+    "INACTIVE": "Off Duty",
+}
+
+
+def _doctor_to_dict(doctor) -> dict:
+    return {
+        "user_id": str(doctor.user_id),
+        "id": str(doctor.user_id),
+        "name": doctor.user_name,
+        "specialty": doctor.department or "General Medicine",
+        "status": SHIFT_STATUS_MAP.get(doctor.status, "Off Duty"),
+        "active_patients": 0,
+        "email": doctor.email,
+        "phone": doctor.phone,
+        "department": doctor.department,
+    }
+
 
 def _staff_to_dict(account):
     data = {
@@ -85,6 +105,24 @@ async def list_staff_service(db: AsyncSession):
     except Exception as e:
         return api_response_error(
             message=f"Failed to fetch staff: {str(e)}",
+            status_code=StatusCode.internalServerError,
+        )
+
+
+async def list_doctors_service(db: AsyncSession):
+    try:
+        doctors = (await db.execute(select(Doctor))).scalars().all()
+        records = [_doctor_to_dict(doctor) for doctor in doctors]
+
+        return api_response_success(
+            data=records,
+            message="Doctors fetched successfully",
+            status_code=StatusCode.success,
+        )
+
+    except Exception as e:
+        return api_response_error(
+            message=f"Failed to fetch doctors: {str(e)}",
             status_code=StatusCode.internalServerError,
         )
 

@@ -14,6 +14,7 @@ import uvicorn
 
 from src.modules.admin.admin_routes import router as admin_router
 from src.modules.doctor.doctor_routes import router as doctor_router
+from src.modules.hospital.hospital_routes import router as hospital_router
 
 
 async def ensure_schema():
@@ -27,6 +28,10 @@ async def ensure_schema():
     from src.models.patient_model import Patient  # noqa: F401
     from src.models.receptionist_model import Receptionist  # noqa: F401
     from src.models.permission_model import Permission  # noqa: F401
+    from src.models.bed_model import Bed  # noqa: F401
+    from src.models.admission_model import Admission  # noqa: F401
+    from src.models.task_model import ClinicalTask  # noqa: F401
+    from src.models.hospital_setting_model import HospitalSetting  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -43,12 +48,57 @@ async def ensure_schema():
             await conn.execute(text(statement))
 
 
+async def seed_hospital_data():
+    """Insert demo beds/admissions/tasks/settings only when empty."""
+    from sqlalchemy import func, select
+
+    from src.config.database import SessionLocal
+    from src.models.admission_model import Admission
+    from src.models.bed_model import Bed
+    from src.models.hospital_setting_model import HospitalSetting
+    from src.models.task_model import ClinicalTask
+    from src.modules.hospital.hospital_query import DEFAULT_SETTINGS
+    from src.modules.hospital.seed_data import (
+        SEED_ADMISSIONS,
+        SEED_BEDS,
+        SEED_TASKS,
+    )
+
+    async with SessionLocal() as db:
+        if (
+            await db.execute(
+                select(func.count()).select_from(HospitalSetting)
+            )
+        ).scalar_one() == 0:
+            db.add(HospitalSetting(**DEFAULT_SETTINGS))
+
+        if (await db.execute(select(func.count()).select_from(Bed))).scalar_one() == 0:
+            for row in SEED_BEDS:
+                db.add(Bed(**row))
+
+        if (
+            await db.execute(select(func.count()).select_from(Admission))
+        ).scalar_one() == 0:
+            for row in SEED_ADMISSIONS:
+                db.add(Admission(**row))
+
+        if (
+            await db.execute(select(func.count()).select_from(ClinicalTask))
+        ).scalar_one() == 0:
+            for row in SEED_TASKS:
+                db.add(ClinicalTask(**row))
+
+        await db.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("[STARTUP] Hospital Management backend running.")
     try:
         await ensure_schema()
         print("[STARTUP] Schema up to date (all tables present).")
+        await seed_hospital_data()
+        print("[STARTUP] Demo hospital data seeded (if tables were empty).")
     except Exception as exc:  # pragma: no cover - defensive startup
         print(f"[STARTUP] WARNING: could not ensure schema: {exc}")
     yield
@@ -58,6 +108,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Hospital Management Backend", version="1.0.0", lifespan=lifespan)
 app.include_router(admin_router)
 app.include_router(doctor_router)
+app.include_router(hospital_router)
 
 
 allowed_origins = [

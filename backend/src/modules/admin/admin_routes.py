@@ -17,6 +17,7 @@ from src.modules.admin.admin_service import (
     assign_permissions_service,
     create_subadmin_service,
     delete_staff_service,
+    list_doctors_service,
     list_staff_service,
     login_staff_service,
     register_admin_service,
@@ -54,6 +55,14 @@ async def assign_permissions(
     db: AsyncSession = Depends(get_db),
 ):
     return await assign_permissions_service(payload, db)
+
+@router.get("/doctors")
+async def list_doctors(
+    admin=Depends(authorization(allowed_roles=["ADMIN", "SUBADMIN"])),
+    db: AsyncSession = Depends(get_db),
+):
+    return await list_doctors_service(db)
+
 
 @router.get("/staff")
 async def list_staff(
