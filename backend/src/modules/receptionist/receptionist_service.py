@@ -1,8 +1,7 @@
 """Business logic for the Receptionist module.
 
-Front-desk operations — patient registration, OPD appointment booking and
-billing entry — are managed from here. Low-level DB helpers live in
-`receptionist_query.py`.
+Front-desk operations — OPD appointment booking and billing entry — are
+managed from here. Low-level DB helpers live in `receptionist_query.py`.
 """
 
 import json
@@ -23,18 +22,14 @@ from src.modules.receptionist.receptionist_query import (
     appointment_to_dict,
     find_appointment_by_id,
     find_invoice_by_id,
-    find_patient_by_phone,
-    find_patient_by_user_id,
     generate_appointment_id,
     generate_invoice_id,
     invoice_to_dict,
-    patient_to_dict,
 )
 from src.utils.common_schema import api_response_success, api_response_error
 from src.utils.security import get_password_hash
 from src.utils.status_code import StatusCode
 
-VALID_PATIENT_STATUSES = {"ACTIVE", "INACTIVE", "SUSPENDED"}
 VALID_APPOINTMENT_STATUSES = {"SCHEDULED", "CHECKED-IN", "CANCELLED"}
 VALID_INSURANCE_STATUSES = {"COVERED", "UNINSURED", "PENDING"}
 VALID_PAYMENT_STATUSES = {"PAID", "UNPAID"}
@@ -96,146 +91,6 @@ async def create_receptionist_service(payload, db: AsyncSession):
         await db.rollback()
         return api_response_error(
             message=f"Failed to create receptionist: {str(e)}",
-            status_code=StatusCode.internalServerError,
-        )
-
-
-# ─────────────────────── Patient Registration ───────────────────────
-
-async def list_patients_service(db: AsyncSession):
-    try:
-        patients = (
-            (await db.execute(
-                select(Patient).order_by(Patient.created_at.desc())
-            ))
-            .scalars()
-            .all()
-        )
-        return api_response_success(
-            data=[patient_to_dict(p) for p in patients],
-            message="Patients fetched successfully",
-            status_code=StatusCode.success,
-        )
-    except Exception as e:
-        return api_response_error(
-            message=f"Failed to fetch patients: {str(e)}",
-            status_code=StatusCode.internalServerError,
-        )
-
-
-async def create_patient_service(payload, db: AsyncSession):
-    try:
-        if await find_patient_by_phone(db, payload.phone):
-            return api_response_error(
-                message="A patient with this phone number is already registered",
-                status_code=StatusCode.conflict,
-            )
-
-        if payload.user_name:
-            result = await db.execute(
-                select(Patient).where(Patient.user_name == payload.user_name)
-            )
-            if result.scalar_one_or_none():
-                return api_response_error(
-                    message="Username already exists",
-                    status_code=StatusCode.conflict,
-                )
-
-        patient = Patient(
-            user_name=payload.user_name,
-            email=payload.email or None,
-            phone=payload.phone,
-            password=None,
-            age=payload.age,
-            gender=payload.gender,
-            insurance_provider=payload.insurance_provider,
-            role="PATIENT",
-            status="ACTIVE",
-        )
-        db.add(patient)
-        await db.commit()
-        await db.refresh(patient)
-
-        return api_response_success(
-            data=patient_to_dict(patient),
-            message=f"Patient {patient.user_name} registered successfully",
-            status_code=StatusCode.create,
-        )
-    except Exception as e:
-        await db.rollback()
-        return api_response_error(
-            message=f"Failed to register patient: {str(e)}",
-            status_code=StatusCode.internalServerError,
-        )
-
-
-async def update_patient_service(user_id, payload, db: AsyncSession):
-    try:
-        patient = await find_patient_by_user_id(db, user_id)
-        if not patient:
-            return api_response_error(
-                message="Patient not found",
-                status_code=StatusCode.notFound,
-            )
-
-        if payload.phone is not None and payload.phone != patient.phone:
-            if await find_patient_by_phone(db, payload.phone):
-                return api_response_error(
-                    message="A patient with this phone number is already registered",
-                    status_code=StatusCode.conflict,
-                )
-            patient.phone = payload.phone
-
-        if payload.user_name is not None:
-            patient.user_name = payload.user_name
-        if payload.email is not None:
-            patient.email = payload.email or None
-        if payload.age is not None:
-            patient.age = payload.age
-        if payload.gender is not None:
-            patient.gender = payload.gender
-        if payload.insurance_provider is not None:
-            patient.insurance_provider = payload.insurance_provider
-        if payload.status is not None and payload.status.upper() in VALID_PATIENT_STATUSES:
-            patient.status = payload.status.upper()
-
-        await db.commit()
-        await db.refresh(patient)
-
-        return api_response_success(
-            data=patient_to_dict(patient),
-            message="Patient updated successfully",
-            status_code=StatusCode.success,
-        )
-    except Exception as e:
-        await db.rollback()
-        return api_response_error(
-            message=f"Failed to update patient: {str(e)}",
-            status_code=StatusCode.internalServerError,
-        )
-
-
-async def delete_patient_service(user_id, db: AsyncSession):
-    try:
-        patient = await find_patient_by_user_id(db, user_id)
-        if not patient:
-            return api_response_error(
-                message="Patient not found",
-                status_code=StatusCode.notFound,
-            )
-
-        await db.delete(patient)
-        await db.commit()
-
-        return api_response_success(
-            data=None,
-            message="Patient record deleted permanently",
-            status_code=StatusCode.success,
-        )
-    except Exception as e:
-        await db.rollback()
-        return api_response_error(
-            message=f"Failed to delete patient: {str(e)}",
             status_code=StatusCode.internalServerError,
         )
 

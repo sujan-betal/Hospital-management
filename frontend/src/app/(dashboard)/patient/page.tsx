@@ -25,6 +25,7 @@ import {
   Shield,
   Smartphone
 } from "lucide-react"
+import { getPatientProfile, updatePatientProfile } from "@/services/patient.service"
 
 // Types & Mock Data for Patient Panel
 interface DoctorReview {
@@ -59,7 +60,7 @@ export default function PatientDashboard() {
   const [activeTab, setActiveTab] = useState<"records" | "book" | "profile">("records")
   const [currentTime, setCurrentTime] = useState("")
 
-  // Patient Info state (Self-Registration info)
+  // Patient Info state (fetched from the patient API, falls back to demo data)
   const [profile, setProfile] = useState({
     fullName: "Emma Watson",
     age: 32,
@@ -106,6 +107,34 @@ export default function PatientDashboard() {
     return () => clearInterval(timer)
   }, [])
 
+  // Fetch the logged-in patient profile from the patient API.
+  // Falls back to the demo profile when not authenticated / offline.
+  useEffect(() => {
+    let active = true
+    async function load() {
+      try {
+        const res = await getPatientProfile()
+        if (!active || !res?.data) return
+        const p = res.data
+        setProfile((prev) => ({
+          ...prev,
+          fullName: p.user_name || prev.fullName,
+          age: p.age ?? prev.age,
+          gender: p.gender || prev.gender,
+          phone: p.phone || prev.phone,
+          email: p.email || prev.email,
+          insuranceProvider: p.insurance_provider && p.insurance_provider !== "Self-Pay / None"
+            ? p.insurance_provider
+            : prev.insuranceProvider,
+        }))
+      } catch {
+        // No token or API offline: keep the demo profile so the UI never breaks.
+      }
+    }
+    load()
+    return () => { active = false }
+  }, [])
+
   // Action: Book appointment
   const handleBookSlot = (doc: DoctorReview, slot: string) => {
     const created: PatientAppointment = {
@@ -127,6 +156,23 @@ export default function PatientDashboard() {
   // Action: Pay invoice
   const handlePayInvoice = (id: string) => {
     setRecords(records.map(rec => rec.id === id ? { ...rec, status: "paid" as const } : rec))
+  }
+
+  // Action: Save updated profile to the patient API
+  const handleSaveProfile = async () => {
+    try {
+      await updatePatientProfile({
+        user_name: profile.fullName,
+        email: profile.email || undefined,
+        phone: profile.phone,
+        age: profile.age,
+        gender: profile.gender,
+        insurance_provider: profile.insuranceProvider || undefined,
+      })
+      alert("Registration profile successfully updated in the hospital database!")
+    } catch {
+      alert("Could not save changes. Please check your connection and try again.")
+    }
   }
 
   // Filter doctors list
@@ -195,7 +241,7 @@ export default function PatientDashboard() {
         <div className="p-4 border-t border-[#1B352E] bg-[#071310]">
           <div className="flex items-center gap-3 p-2 rounded-xl">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-[#12463E] flex items-center justify-center font-bold text-white border border-[#1E5D52]">
-              EW
+              {profile.fullName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "PT"}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-white truncate font-sans">{profile.fullName}</p>
@@ -441,7 +487,7 @@ export default function PatientDashboard() {
                 {/* Profile Overview Card */}
                 <div className="lg:col-span-1 bg-white border border-[#E8ECEB] rounded-3xl p-6 shadow-sm flex flex-col items-center text-center">
                   <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-500 to-[#12463E] border-4 border-white flex items-center justify-center font-bold text-white text-3xl shadow-xl shadow-emerald-500/10">
-                    EW
+                    {profile.fullName.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "PT"}
                   </div>
                   <h3 className="font-black text-xl text-[#0B2B26] mt-4">{profile.fullName}</h3>
                   <p className="text-xs text-[#8AA098] mt-1">Accredited Member since 2026</p>
@@ -541,7 +587,7 @@ export default function PatientDashboard() {
                       <button
                         type="button"
                         className="px-4 py-2.5 bg-[#12463E] hover:bg-[#0B2B26] text-white rounded-xl text-xs font-semibold transition-all shadow-md shadow-emerald-500/10"
-                        onClick={() => alert("Registration profile successfully updated in the hospital database!")}
+                        onClick={handleSaveProfile}
                       >
                         Update Details
                       </button>

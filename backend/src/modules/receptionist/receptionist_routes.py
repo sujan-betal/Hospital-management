@@ -11,26 +11,20 @@ from src.modules.receptionist.receptionist_schema import (
     AppointmentUpdateRequest,
     InvoiceCreateRequest,
     InvoiceUpdateRequest,
-    PatientCreateRequest,
-    PatientUpdateRequest,
     ReceptionistCreateRequest,
 )
 from src.modules.receptionist.receptionist_service import (
     create_appointment_service,
     create_invoice_service,
-    create_patient_service,
     create_receptionist_service,
     delete_appointment_service,
     delete_invoice_service,
-    delete_patient_service,
     get_dashboard_service,
     list_appointments_service,
     list_doctors_service,
     list_invoices_service,
-    list_patients_service,
     update_appointment_service,
     update_invoice_service,
-    update_patient_service,
 )
 
 router = APIRouter(prefix="/api/receptionist", tags=["Receptionist"])
@@ -45,42 +39,6 @@ async def create_receptionist(
     db: AsyncSession = Depends(get_db),
 ):
     return await create_receptionist_service(payload, db)
-
-
-@router.get("/patients")
-async def list_patients(
-    staff=Depends(authorization(allowed_roles=FRONT_DESK_ROLES)),
-    db: AsyncSession = Depends(get_db),
-):
-    return await list_patients_service(db)
-
-
-@router.post("/patients")
-async def create_patient(
-    payload: PatientCreateRequest,
-    staff=Depends(authorization(allowed_roles=FRONT_DESK_ROLES)),
-    db: AsyncSession = Depends(get_db),
-):
-    return await create_patient_service(payload, db)
-
-
-@router.put("/patients/{user_id}")
-async def update_patient(
-    user_id: uuid_lib.UUID,
-    payload: PatientUpdateRequest,
-    staff=Depends(authorization(allowed_roles=FRONT_DESK_ROLES)),
-    db: AsyncSession = Depends(get_db),
-):
-    return await update_patient_service(user_id, payload, db)
-
-
-@router.delete("/patients/{user_id}")
-async def delete_patient(
-    user_id: uuid_lib.UUID,
-    staff=Depends(authorization(allowed_roles=FRONT_DESK_ROLES)),
-    db: AsyncSession = Depends(get_db),
-):
-    return await delete_patient_service(user_id, db)
 
 
 @router.get("/doctors")

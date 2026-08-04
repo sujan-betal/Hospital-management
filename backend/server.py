@@ -16,6 +16,7 @@ from src.modules.admin.admin_routes import router as admin_router
 from src.modules.doctor.doctor_routes import router as doctor_router
 from src.modules.hospital.hospital_routes import router as hospital_router
 from src.modules.receptionist.receptionist_routes import router as receptionist_router
+from src.modules.patient.patient_routes import router as patient_router
 
 
 async def ensure_schema():
@@ -48,6 +49,8 @@ async def ensure_schema():
         "ALTER TABLE patients ADD COLUMN IF NOT EXISTS age INTEGER",
         "ALTER TABLE patients ADD COLUMN IF NOT EXISTS gender VARCHAR",
         "ALTER TABLE patients ADD COLUMN IF NOT EXISTS insurance_provider VARCHAR",
+        "ALTER TABLE patients ADD COLUMN IF NOT EXISTS otp_code TEXT",
+        "ALTER TABLE patients ADD COLUMN IF NOT EXISTS otp_expiry TIMESTAMPTZ",
     ]
     async with engine.begin() as conn:
         for statement in statements:
@@ -154,6 +157,7 @@ app.include_router(admin_router)
 app.include_router(doctor_router)
 app.include_router(hospital_router)
 app.include_router(receptionist_router)
+app.include_router(patient_router)
 
 
 allowed_origins = [

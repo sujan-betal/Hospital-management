@@ -1,18 +1,13 @@
 import { api } from "@/lib/api"
+import {
+  listPatients,
+  updatePatient,
+  deletePatient,
+  createPatient as createPatientService,
+  type Patient,
+} from "@/services/patient.service"
 
-export interface Patient {
-  id: number
-  user_id: string
-  user_name: string
-  name: string
-  email: string
-  phone: string
-  age: number | null
-  gender: string | null
-  insurance_provider: string
-  status: string
-  created_at: string | null
-}
+export { listPatients, updatePatient, deletePatient }
 
 export interface PatientPayload {
   user_name: string
@@ -99,22 +94,10 @@ export interface ApiResponse<T> {
   message: string
 }
 
-// ─── Patients ───────────────────────────────────────────────
-
-export async function listPatients() {
-  return api.get<ApiResponse<Patient[]>>("/api/receptionist/patients")
-}
+// ─── Patients (owned by the Patient module) ─────────────────────
 
 export async function registerPatient(payload: PatientPayload) {
-  return api.post<ApiResponse<Patient>>("/api/receptionist/patients", payload)
-}
-
-export async function updatePatient(userId: string, payload: Partial<PatientPayload>) {
-  return api.put<ApiResponse<Patient>>(`/api/receptionist/patients/${userId}`, payload)
-}
-
-export async function deletePatient(userId: string) {
-  return api.delete<ApiResponse<null>>(`/api/receptionist/patients/${userId}`)
+  return createPatientService(payload)
 }
 
 // ─── Doctors ────────────────────────────────────────────────

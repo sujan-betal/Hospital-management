@@ -1,8 +1,7 @@
 """Pydantic request schemas for the Receptionist module.
 
-Front-desk operations — patient registration, OPD appointment booking and
-billing entry — are consolidated here so the whole receptionist domain lives
-under one schema module.
+Front-desk operations — OPD appointment booking and billing entry — are
+consolidated here. Patient schemas live in the Patient module.
 """
 
 from pydantic import BaseModel, EmailStr, Field
@@ -14,27 +13,6 @@ class ReceptionistCreateRequest(BaseModel):
     user_name: str = Field(..., min_length=3, max_length=50)
     email: EmailStr
     password: str = Field(..., min_length=6)
-
-
-# ─────────────────────── Patient Registration ───────────────────────
-
-class PatientCreateRequest(BaseModel):
-    user_name: str = Field(..., min_length=2, max_length=100)
-    email: str = Field(default="", max_length=120)
-    phone: str = Field(..., min_length=6, max_length=30)
-    age: int | None = Field(default=None, ge=0, le=150)
-    gender: str | None = Field(default=None, max_length=20)
-    insurance_provider: str | None = Field(default=None, max_length=120)
-
-
-class PatientUpdateRequest(BaseModel):
-    user_name: str | None = Field(default=None, min_length=2, max_length=100)
-    email: str | None = Field(default=None, max_length=120)
-    phone: str | None = Field(default=None, min_length=6, max_length=30)
-    age: int | None = Field(default=None, ge=0, le=150)
-    gender: str | None = Field(default=None, max_length=20)
-    insurance_provider: str | None = Field(default=None, max_length=120)
-    status: str | None = Field(default=None, max_length=20)
 
 
 # ─────────────────────── OPD Appointments ───────────────────────

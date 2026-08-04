@@ -14,7 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.invoice_model import Invoice
 from src.models.opd_appointment_model import OpdAppointment
-from src.models.patient_model import Patient
 
 # ─────────────────────────── Generic ───────────────────────────
 
@@ -29,36 +28,6 @@ async def _generate_unique_id(db: AsyncSession, model, id_field, prefix: str, di
         if result.scalar_one_or_none() is None:
             return value
     return f"{prefix}-{uuid.uuid4().hex[:6].upper()}"
-
-
-# ─────────────────────── Patient Registration ───────────────────────
-
-def patient_to_dict(patient: Patient) -> dict:
-    return {
-        "id": patient.id,
-        "user_id": str(patient.user_id),
-        "user_name": patient.user_name,
-        "name": patient.user_name,
-        "email": patient.email or "",
-        "phone": patient.phone,
-        "age": patient.age,
-        "gender": patient.gender,
-        "insurance_provider": patient.insurance_provider or "Self-Pay / None",
-        "status": patient.status,
-        "role": patient.role,
-        "created_at": patient.created_at,
-        "updated_at": patient.updated_at,
-    }
-
-
-async def find_patient_by_user_id(db: AsyncSession, user_id):
-    result = await db.execute(select(Patient).where(Patient.user_id == user_id))
-    return result.scalar_one_or_none()
-
-
-async def find_patient_by_phone(db: AsyncSession, phone: str):
-    result = await db.execute(select(Patient).where(Patient.phone == phone))
-    return result.scalar_one_or_none()
 
 
 # ─────────────────────── OPD Appointments ───────────────────────
