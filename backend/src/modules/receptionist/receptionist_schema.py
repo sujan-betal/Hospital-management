@@ -46,6 +46,7 @@ class InvoiceItem(BaseModel):
 
 class InvoiceCreateRequest(BaseModel):
     patient_name: str = Field(..., min_length=2, max_length=100)
+    patient_phone: str | None = Field(default=None, max_length=30)
     date: str = Field(..., min_length=4, max_length=30)
     items: list[InvoiceItem] = Field(default_factory=list)
     insurance_status: str = Field(default="UNINSURED", max_length=20)
@@ -54,6 +55,7 @@ class InvoiceCreateRequest(BaseModel):
 
 class InvoiceUpdateRequest(BaseModel):
     patient_name: str | None = Field(default=None, min_length=2, max_length=100)
+    patient_phone: str | None = Field(default=None, max_length=30)
     date: str | None = Field(default=None, min_length=4, max_length=30)
     items: list[InvoiceItem] | None = None
     insurance_status: str | None = Field(default=None, max_length=20)

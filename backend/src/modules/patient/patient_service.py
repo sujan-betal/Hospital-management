@@ -9,16 +9,23 @@ import os
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.models.opd_appointment_model import OpdAppointment
 from src.models.patient_model import Patient
 from src.modules.patient.patient_query import (
+    appointment_to_dict,
     clear_patient_otp,
+    find_patient_appointments,
     find_patient_by_phone,
     find_patient_by_phone_normalized,
     find_patient_by_user_id,
+    find_patient_invoices,
+    invoice_to_dict,
+    list_active_doctors,
     patient_to_dict,
     set_patient_otp,
 )
 from src.modules.patient.patient_schema import (
+    PatientAppointmentCreateRequest,
     PatientCreateRequest,
     PatientOtpSendRequest,
     PatientOtpVerifyRequest,
@@ -95,14 +102,26 @@ async def create_patient_service(payload: PatientCreateRequest, db: AsyncSession
 # ─────────────────────── OTP login flow ───────────────────────
 
 async def send_otp_service(payload: PatientOtpSendRequest, db: AsyncSession):
-    """Send a login OTP to the patient's registered phone number."""
+    """Send a login OTP to a phone number.
+
+    No pre-registration is required — a patient account is created on the
+    fly the first time a phone number requests an OTP.
+    """
     try:
         patient = await find_patient_by_phone_normalized(db, payload.phone)
         if not patient:
-            return api_response_error(
-                message="No patient account is registered with this phone number",
-                status_code=StatusCode.notFound,
+            # Self-registration: the account is created on first login, so
+            # the patient just needs their phone number.
+            patient = Patient(
+                user_name=None,
+                email=None,
+                phone=payload.phone,
+                password=None,
+                role="PATIENT",
+                status="ACTIVE",
             )
+            db.add(patient)
+            await db.flush()
 
         if patient.status != "ACTIVE":
             return api_response_error(
@@ -255,6 +274,118 @@ async def update_patient_profile_service(current_patient, payload: PatientUpdate
         await db.rollback()
         return api_response_error(
             message=f"Failed to update profile: {str(e)}",
+            status_code=StatusCode.internalServerError,
+        )
+
+
+# ─────────────────────── Self-service appointments & billing ───────────────────────
+
+async def list_patient_doctors_service(db: AsyncSession):
+    """Return ACTIVE doctors for the patient booking directory."""
+    try:
+        doctors = await list_active_doctors(db)
+        return api_response_success(
+            data=doctors,
+            message="Doctors fetched successfully",
+            status_code=StatusCode.success,
+        )
+    except Exception as e:
+        return api_response_error(
+            message=f"Failed to fetch doctors: {str(e)}",
+            status_code=StatusCode.internalServerError,
+        )
+
+
+async def list_patient_appointments_service(current_patient, db: AsyncSession):
+    """Return the logged-in patient's OPD appointments."""
+    try:
+        patient = await find_patient_by_user_id(db, current_patient.user_id)
+        if not patient:
+            return api_response_error(
+                message="Patient not found",
+                status_code=StatusCode.notFound,
+            )
+
+        appointments = await find_patient_appointments(db, patient)
+        return api_response_success(
+            data=[appointment_to_dict(a) for a in appointments],
+            message="Appointments fetched successfully",
+            status_code=StatusCode.success,
+        )
+    except Exception as e:
+        return api_response_error(
+            message=f"Failed to fetch appointments: {str(e)}",
+            status_code=StatusCode.internalServerError,
+        )
+
+
+async def list_patient_invoices_service(current_patient, db: AsyncSession):
+    """Return the logged-in patient's invoices/bills."""
+    try:
+        patient = await find_patient_by_user_id(db, current_patient.user_id)
+        if not patient:
+            return api_response_error(
+                message="Patient not found",
+                status_code=StatusCode.notFound,
+            )
+
+        invoices = await find_patient_invoices(db, patient)
+        return api_response_success(
+            data=[invoice_to_dict(inv) for inv in invoices],
+            message="Invoices fetched successfully",
+            status_code=StatusCode.success,
+        )
+    except Exception as e:
+        return api_response_error(
+            message=f"Failed to fetch invoices: {str(e)}",
+            status_code=StatusCode.internalServerError,
+        )
+
+
+async def book_appointment_service(current_patient, payload: PatientAppointmentCreateRequest, db: AsyncSession):
+    """Let a logged-in patient book an OPD slot. Identity comes from the
+    authenticated account so the appointment links back to the patient."""
+    try:
+        from src.modules.receptionist.receptionist_query import (
+            generate_appointment_id,
+        )
+
+        patient = await find_patient_by_user_id(db, current_patient.user_id)
+        if not patient:
+            return api_response_error(
+                message="Patient not found",
+                status_code=StatusCode.notFound,
+            )
+
+        if not patient.user_name:
+            return api_response_error(
+                message="Please set your name in the Profile tab before booking",
+                status_code=StatusCode.badRequest,
+            )
+
+        appt = OpdAppointment(
+            appointment_id=await generate_appointment_id(db),
+            patient_name=patient.user_name,
+            patient_phone=patient.phone,
+            doctor_name=payload.doctor_name,
+            specialty=payload.specialty,
+            date=payload.date,
+            time=payload.time,
+            status="SCHEDULED",
+        )
+        db.add(appt)
+        await db.commit()
+        await db.refresh(appt)
+
+        return api_response_success(
+            data=appointment_to_dict(appt),
+            message=f"Appointment {appt.appointment_id} booked successfully",
+            status_code=StatusCode.create,
+        )
+    except Exception as e:
+        await db.rollback()
+        return api_response_error(
+            message=f"Failed to book appointment: {str(e)}",
             status_code=StatusCode.internalServerError,
         )
 

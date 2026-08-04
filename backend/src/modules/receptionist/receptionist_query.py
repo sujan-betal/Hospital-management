@@ -78,6 +78,7 @@ def invoice_to_dict(invoice: Invoice) -> dict:
         "id": invoice.id,
         "invoice_id": invoice.invoice_id,
         "patient_name": invoice.patient_name,
+        "patient_phone": invoice.patient_phone or "",
         "date": invoice.date,
         "amount": invoice.amount,
         "items": invoice_items_from_db(invoice.items),

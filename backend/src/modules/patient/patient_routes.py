@@ -6,16 +6,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.config.database import get_db
 from src.middleware.auth import authorization
 from src.modules.patient.patient_schema import (
+    PatientAppointmentCreateRequest,
     PatientCreateRequest,
     PatientOtpSendRequest,
     PatientOtpVerifyRequest,
     PatientUpdateRequest,
 )
 from src.modules.patient.patient_service import (
+    book_appointment_service,
     create_patient_service,
     delete_patient_service,
     get_patient_profile_service,
     get_patient_service,
+    list_patient_appointments_service,
+    list_patient_doctors_service,
+    list_patient_invoices_service,
     list_patients_service,
     send_otp_service,
     update_patient_profile_service,
@@ -69,6 +74,39 @@ async def update_profile(
     db: AsyncSession = Depends(get_db),
 ):
     return await update_patient_profile_service(patient, payload, db)
+
+
+@router.get("/doctors")
+async def list_doctors(
+    patient=Depends(authorization(allowed_roles=PATIENT_ROLES)),
+    db: AsyncSession = Depends(get_db),
+):
+    return await list_patient_doctors_service(db)
+
+
+@router.get("/appointments")
+async def list_appointments(
+    patient=Depends(authorization(allowed_roles=PATIENT_ROLES)),
+    db: AsyncSession = Depends(get_db),
+):
+    return await list_patient_appointments_service(patient, db)
+
+
+@router.post("/appointments")
+async def book_appointment(
+    payload: PatientAppointmentCreateRequest,
+    patient=Depends(authorization(allowed_roles=PATIENT_ROLES)),
+    db: AsyncSession = Depends(get_db),
+):
+    return await book_appointment_service(patient, payload, db)
+
+
+@router.get("/invoices")
+async def list_invoices(
+    patient=Depends(authorization(allowed_roles=PATIENT_ROLES)),
+    db: AsyncSession = Depends(get_db),
+):
+    return await list_patient_invoices_service(patient, db)
 
 
 @router.get("")

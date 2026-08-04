@@ -44,6 +44,55 @@ export interface PatientUpdatePayload {
   status?: string
 }
 
+export interface PatientAppointment {
+  id: number
+  appointment_id: string
+  patient_name: string
+  patient_phone: string
+  doctor_name: string
+  specialty: string
+  date: string
+  time: string
+  status: string
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface PatientInvoiceItem {
+  description: string
+  cost: number
+}
+
+export interface PatientInvoice {
+  id: number
+  invoice_id: string
+  patient_name: string
+  patient_phone: string
+  date: string
+  amount: number
+  items: PatientInvoiceItem[]
+  insurance_status: string
+  payment_status: string
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface PatientBookingPayload {
+  doctor_name: string
+  specialty: string
+  date: string
+  time: string
+}
+
+export interface Doctor {
+  user_id: string
+  name: string
+  specialty: string
+  department: string | null
+  email: string
+  phone: string | null
+}
+
 export interface ApiResponse<T> {
   data: T
   success: boolean
@@ -69,6 +118,24 @@ export async function getPatientProfile() {
 
 export async function updatePatientProfile(payload: PatientUpdatePayload) {
   return api.put<ApiResponse<Patient>>("/api/patient/me", payload)
+}
+
+// ─── Self-service appointments & billing ─────────────────────────
+
+export async function getPatientDoctors() {
+  return api.get<ApiResponse<Doctor[]>>("/api/patient/doctors")
+}
+
+export async function getPatientAppointments() {
+  return api.get<ApiResponse<PatientAppointment[]>>("/api/patient/appointments")
+}
+
+export async function bookPatientAppointment(payload: PatientBookingPayload) {
+  return api.post<ApiResponse<PatientAppointment>>("/api/patient/appointments", payload)
+}
+
+export async function getPatientInvoices() {
+  return api.get<ApiResponse<PatientInvoice[]>>("/api/patient/invoices")
 }
 
 // ─── Staff/admin patient management ─────────────────────────────

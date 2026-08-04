@@ -283,6 +283,7 @@ async def create_invoice_service(payload, db: AsyncSession):
         invoice = Invoice(
             invoice_id=await generate_invoice_id(db),
             patient_name=payload.patient_name,
+            patient_phone=payload.patient_phone or None,
             date=payload.date,
             amount=amount,
             items=json.dumps(items),
@@ -321,6 +322,8 @@ async def update_invoice_service(invoice_id: str, payload, db: AsyncSession):
 
         if payload.patient_name is not None:
             invoice.patient_name = payload.patient_name
+        if payload.patient_phone is not None:
+            invoice.patient_phone = payload.patient_phone or None
         if payload.date is not None:
             invoice.date = payload.date
         if payload.items is not None:

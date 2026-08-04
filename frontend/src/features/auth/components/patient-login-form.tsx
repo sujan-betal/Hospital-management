@@ -102,7 +102,7 @@ export function PatientLoginForm() {
     <form onSubmit={submit} className="space-y-4">
       <div className="space-y-1.5">
         <label htmlFor="phone" className="text-[13px] font-semibold text-[#12463E] tracking-wide">
-          Registered phone number
+          Phone number
         </label>
         <Field icon={Smartphone} error={errors.phone}>
           <input
@@ -119,7 +119,7 @@ export function PatientLoginForm() {
         {!otpSent && (
           <p className="text-[11px] text-[#9CAEA6] flex items-center gap-1.5 pl-0.5">
             <Sparkles className="h-3 w-3 text-emerald-500" />
-            Demo: try <span className="font-mono font-semibold text-[#12463E]">+1 (555) 019-2834</span>
+            No registration needed — just enter your phone number
           </p>
         )}
       </div>

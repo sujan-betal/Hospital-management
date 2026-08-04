@@ -51,6 +51,7 @@ async def ensure_schema():
         "ALTER TABLE patients ADD COLUMN IF NOT EXISTS insurance_provider VARCHAR",
         "ALTER TABLE patients ADD COLUMN IF NOT EXISTS otp_code TEXT",
         "ALTER TABLE patients ADD COLUMN IF NOT EXISTS otp_expiry TIMESTAMPTZ",
+        "ALTER TABLE invoices ADD COLUMN IF NOT EXISTS patient_phone VARCHAR",
     ]
     async with engine.begin() as conn:
         for statement in statements:

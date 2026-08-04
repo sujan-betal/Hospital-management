@@ -29,3 +29,12 @@ class PatientUpdateRequest(BaseModel):
     gender: str | None = Field(default=None, max_length=20)
     insurance_provider: str | None = Field(default=None, max_length=120)
     status: str | None = Field(default=None, max_length=20)
+
+
+class PatientAppointmentCreateRequest(BaseModel):
+    """Self-service OPD appointment booking. Patient identity (name/phone)
+    is taken from the authenticated account, not trusted client input."""
+    doctor_name: str = Field(..., min_length=2, max_length=100)
+    specialty: str = Field(default="General Medicine", max_length=50)
+    date: str = Field(..., min_length=4, max_length=30)
+    time: str = Field(..., min_length=3, max_length=30)
