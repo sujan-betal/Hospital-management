@@ -22,8 +22,10 @@ from src.modules.admin.admin_service import (
     list_staff_service,
     login_staff_service,
     register_admin_service,
+    update_doctor_bank_details_service,
     update_staff_service,
 )
+from src.modules.doctor.doctor_schema import DoctorBankDetailsRequest
 
 router = APIRouter(prefix="/api/admin", tags=["Admin Authentication"])
 
@@ -80,6 +82,21 @@ async def list_doctors(
     db: AsyncSession = Depends(get_db),
 ):
     return await list_doctors_service(db)
+
+
+@router.put("/doctors/{user_id}/bank-details")
+async def update_doctor_bank_details(
+    user_id: uuid_lib.UUID,
+    payload: DoctorBankDetailsRequest,
+    admin=Depends(
+        authorization(
+            allowed_roles=["ADMIN", "SUBADMIN"],
+            required_permissions=["PAYOUT_MANAGE"],
+        )
+    ),
+    db: AsyncSession = Depends(get_db),
+):
+    return await update_doctor_bank_details_service(str(user_id), payload, db)
 
 
 @router.get("/staff")

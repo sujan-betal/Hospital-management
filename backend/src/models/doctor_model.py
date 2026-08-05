@@ -46,6 +46,13 @@ class Doctor(Base):
         Integer,
         nullable=True
     )
+    bank_account_holder = Column(String, nullable=True)
+    bank_account_number = Column(String, nullable=True)
+    bank_ifsc = Column(String, nullable=True)
+    bank_name = Column(String, nullable=True)
+    upi_id = Column(String, nullable=True)
+    razorpayx_contact_id = Column(String, nullable=True)
+    razorpayx_fund_account_id = Column(String, nullable=True)
     token = Column(
         Text, nullable=True)
     is_reset = Column(

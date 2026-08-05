@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
 import { Sidebar } from "./components/Sidebar"
 import { Navbar } from "./components/Navbar"
 import { Overview } from "./components/Overview"
@@ -10,6 +10,7 @@ import { AttendingDoctors } from "./components/AttendingDoctors"
 import { ClinicalTasks } from "./components/ClinicalTasks"
 import { StaffCredentials } from "./components/StaffCredentials"
 import { HospitalSettings } from "./components/HospitalSettings"
+import { Payments } from "./components/Payments"
 import RequireAuth from "@/components/RequireAuth"
 import {
   initialBeds,
@@ -23,12 +24,37 @@ import {
   MedicalTask,
   StaffCredential
 } from "./mockData"
+import {
+  listBeds,
+  createBed,
+  updateBed as updateBedApi,
+  deleteBed as deleteBedApi,
+  ApiBed,
+  BedCreatePayload,
+  BedUpdatePayload,
+} from "@/services/admin.service"
+
+// Map the backend snake_case bed record onto the camelCase Bed shape
+// the admin components render.
+function fromApiBed(b: ApiBed): Bed {
+  return {
+    id: b.bed_id,
+    ward: b.ward,
+    status: b.status.toLowerCase() as Bed["status"],
+    price: b.price,
+    floor: b.floor,
+    assignedNurse: b.assigned_nurse || "",
+    equipment: b.equipment || [],
+    patient: b.patient,
+  }
+}
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<string>("overview")
   
   // Hospital-wide state
   const [beds, setBeds] = useState<Bed[]>(initialBeds)
+  const [bedsLoading, setBedsLoading] = useState(true)
   const [admissions, setAdmissions] = useState<Admission[]>(initialAdmissions)
   const [doctors, setDoctors] = useState<Doctor[]>(initialDoctors)
   const [tasks, setTasks] = useState<MedicalTask[]>(initialMedicalTasks)
@@ -38,9 +64,76 @@ export default function AdminDashboard() {
   const [isAddAdmissionOpen, setIsAddAdmissionOpen] = useState(false)
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false)
 
+  // Load live beds from the backend on mount. Falls back to demo data
+  // only when the request fails (offline / not authenticated).
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await listBeds()
+        if (!cancelled && res.data) setBeds(res.data.map(fromApiBed))
+      } catch {
+        // keep initialBeds
+      } finally {
+        if (!cancelled) setBedsLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   // Handle Updates
-  const handleUpdateBed = (updatedBed: Bed) => {
-    setBeds(beds.map((b) => (b.id === updatedBed.id ? updatedBed : b)))
+  const handleUpdateBed = async (updatedBed: Bed) => {
+    const payload: BedUpdatePayload = {
+      ward: updatedBed.ward,
+      status: updatedBed.status.toUpperCase(),
+      price: updatedBed.price,
+      floor: updatedBed.floor,
+      assigned_nurse: updatedBed.assignedNurse,
+      equipment: updatedBed.equipment,
+      patient: updatedBed.status !== "occupied" ? null : updatedBed.patient,
+    }
+    try {
+      const res = await updateBedApi(updatedBed.id, payload)
+      setBeds((prev) =>
+        prev.map((b) => (b.id === updatedBed.id ? fromApiBed(res.data) : b))
+      )
+    } catch (err: any) {
+      alert(err?.message || "Failed to update bed")
+    }
+  }
+
+  const handleAddBed = async (newBed: Bed) => {
+    const payload: BedCreatePayload = {
+      bed_id: newBed.id,
+      ward: newBed.ward,
+      status: newBed.status.toUpperCase(),
+      price: newBed.price,
+      floor: newBed.floor,
+      assigned_nurse: newBed.assignedNurse || null,
+      equipment: newBed.equipment,
+      patient: newBed.status === "occupied" ? newBed.patient : null,
+    }
+    try {
+      const res = await createBed(payload)
+      setBeds((prev) => [fromApiBed(res.data), ...prev])
+      return true
+    } catch (err: any) {
+      alert(err?.message || "Failed to add bed")
+      return false
+    }
+  }
+
+  const handleDeleteBed = async (bedId: string) => {
+    try {
+      await deleteBedApi(bedId)
+      setBeds((prev) => prev.filter((b) => b.id !== bedId))
+      return true
+    } catch (err: any) {
+      alert(err?.message || "Failed to delete bed")
+      return false
+    }
   }
 
   const handleAddAdmission = (newAdm: Admission) => {
@@ -146,7 +239,15 @@ export default function AdminDashboard() {
           />
         )
       case "beds":
-        return <WardsAndBeds beds={beds} onUpdateBed={handleUpdateBed} />
+        return (
+          <WardsAndBeds
+            beds={beds}
+            loading={bedsLoading}
+            onAddBed={handleAddBed}
+            onUpdateBed={handleUpdateBed}
+            onDeleteBed={handleDeleteBed}
+          />
+        )
       case "admissions":
         return (
           <PatientAdmissions
@@ -181,6 +282,8 @@ export default function AdminDashboard() {
         )
       case "settings":
         return <HospitalSettings />
+      case "payments":
+        return <Payments />
       default:
         return (
           <Overview

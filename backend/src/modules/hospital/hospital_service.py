@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.admission_model import Admission
 from src.models.bed_model import Bed
+from src.models.opd_appointment_model import OpdAppointment
 from src.models.task_model import ClinicalTask
 from src.modules.hospital.hospital_query import (
     admission_to_dict,
@@ -26,6 +27,7 @@ from src.modules.hospital.hospital_query import (
     settings_to_dict,
     task_to_dict,
 )
+from src.modules.patient.patient_query import appointment_to_dict
 from src.utils.common_schema import api_response_success, api_response_error
 from src.utils.status_code import StatusCode
 
@@ -545,8 +547,8 @@ async def update_settings_service(payload, db: AsyncSession):
     try:
         setting = await get_or_create_settings(db)
         for field in ["hospital_name", "address", "currency", "copay_rate",
-                      "emergency_markup", "auto_telemetry", "sanitation_interval",
-                      "auto_dirty"]:
+                      "emergency_markup", "doctor_share_percent", "auto_telemetry",
+                      "sanitation_interval", "auto_dirty"]:
             value = getattr(payload, field, None)
             if value is not None:
                 setattr(setting, field, value)
@@ -563,5 +565,91 @@ async def update_settings_service(payload, db: AsyncSession):
         await db.rollback()
         return api_response_error(
             message=f"Failed to update settings: {str(e)}",
+            status_code=StatusCode.internalServerError,
+        )
+
+
+# ─────────────────────── Revenue / Doctor settlements ───────────────────────
+
+async def get_revenue_service(db: AsyncSession):
+    """Aggregate paid OPD payments into an admin keep vs. doctor share split.
+
+    Every paid appointment carries a snapshot of the split that applied at
+    payment time (doctor_share_percent, admin_share, doctor_share), so totals
+    remain correct even when the admin later changes the split percentage.
+    """
+    try:
+        settings = await get_or_create_settings(db)
+        paid = (
+            (
+                await db.execute(
+                    select(OpdAppointment)
+                    .where(OpdAppointment.payment_status == "PAID")
+                    .order_by(OpdAppointment.updated_at.desc())
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+        total_collected = 0
+        total_admin = 0
+        total_doctor = 0
+        total_paid_out = 0
+        total_pending = 0
+        doctor_totals: dict[str, dict] = {}
+
+        for appt in paid:
+            fee = appt.fee or 150
+            admin_share = appt.admin_share if appt.admin_share is not None else 0
+            doctor_share = appt.doctor_share if appt.doctor_share is not None else 0
+            total_collected += fee
+            total_admin += admin_share
+            total_doctor += doctor_share
+            if appt.payout_status == "PAID":
+                total_paid_out += doctor_share
+            else:
+                total_pending += doctor_share
+
+            bucket = doctor_totals.setdefault(
+                appt.doctor_name,
+                {"doctor_name": appt.doctor_name, "payments": 0,
+                 "collected": 0, "admin_keep": 0, "doctor_share": 0,
+                 "paid_out": 0, "pending": 0},
+            )
+            bucket["payments"] += 1
+            bucket["collected"] += fee
+            bucket["admin_keep"] += admin_share
+            bucket["doctor_share"] += doctor_share
+            if appt.payout_status == "PAID":
+                bucket["paid_out"] += doctor_share
+            else:
+                bucket["pending"] += doctor_share
+
+        return api_response_success(
+            data={
+                "settings": settings_to_dict(settings),
+                "summary": {
+                    "payment_count": len(paid),
+                    "total_collected": total_collected,
+                    "admin_keep": total_admin,
+                    "doctor_share": total_doctor,
+                    "doctor_share_percent": settings.doctor_share_percent or 0,
+                    "paid_out": total_paid_out,
+                    "pending": total_pending,
+                },
+                "doctors": sorted(
+                    doctor_totals.values(),
+                    key=lambda d: d["collected"],
+                    reverse=True,
+                ),
+                "payments": [appointment_to_dict(a) for a in paid],
+            },
+            message="Revenue breakdown fetched successfully",
+            status_code=StatusCode.success,
+        )
+    except Exception as e:
+        return api_response_error(
+            message=f"Failed to fetch revenue: {str(e)}",
             status_code=StatusCode.internalServerError,
         )

@@ -77,6 +77,7 @@ export function Navbar({ activeTab }: NavbarProps) {
       case "admissions": return "Admissions Registry"
       case "doctors": return "Medical Staff Ledger"
       case "tasks": return "Nursing Orders & Telemetry"
+      case "payments": return "Revenue & Doctor Settlements"
       case "settings": return "Medical Console Configs"
       default: return "Dashboard"
     }

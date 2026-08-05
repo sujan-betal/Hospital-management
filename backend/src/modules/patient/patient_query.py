@@ -91,6 +91,13 @@ def appointment_to_dict(appt: OpdAppointment) -> dict:
         "payment_status": appt.payment_status or "UNPAID",
         "payment_id": appt.payment_id or "",
         "razorpay_order_id": appt.razorpay_order_id or "",
+        "doctor_share_percent": appt.doctor_share_percent or 0,
+        "admin_share": appt.admin_share or 0,
+        "doctor_share": appt.doctor_share or 0,
+        "payout_status": appt.payout_status or "NOT_CONFIGURED",
+        "payout_id": appt.payout_id or "",
+        "payout_error": appt.payout_error or "",
+        "payout_date": appt.payout_date.isoformat() if appt.payout_date else "",
         "created_at": appt.created_at,
         "updated_at": appt.updated_at,
     }

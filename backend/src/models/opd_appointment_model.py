@@ -22,6 +22,13 @@ class OpdAppointment(Base):
     razorpay_order_id = Column(String, nullable=True)
     payment_id = Column(String, nullable=True)
     payment_signature = Column(String, nullable=True)
+    doctor_share_percent = Column(Integer, nullable=True)
+    admin_share = Column(Integer, nullable=True)
+    doctor_share = Column(Integer, nullable=True)
+    payout_status = Column(String, nullable=True, default="NOT_CONFIGURED")
+    payout_id = Column(String, nullable=True)
+    payout_error = Column(String, nullable=True)
+    payout_date = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now()

@@ -13,6 +13,7 @@ from src.modules.admin.permissions_catalog import (
     PERMISSION_CATALOG,
     normalize_permissions,
 )
+from src.modules.doctor.doctor_service import format_doctor_bank_data
 
 VALID_STATUSES = {"ACTIVE", "SUSPENDED", "INACTIVE"}
 
@@ -136,7 +137,9 @@ async def list_staff_service(db: AsyncSession):
 async def list_doctors_service(db: AsyncSession):
     try:
         doctors = (await db.execute(select(Doctor))).scalars().all()
-        records = [_doctor_to_dict(doctor) for doctor in doctors]
+        from src.modules.doctor.doctor_service import format_doctor_data
+
+        records = [format_doctor_data(doctor) for doctor in doctors]
 
         return api_response_success(
             data=records,
@@ -554,5 +557,38 @@ async def list_permissions_service(db: AsyncSession):
     except Exception as e:
         return api_response_error(
             message=f"Failed to fetch permission catalog: {str(e)}",
+            status_code=StatusCode.internalServerError,
+        )
+
+
+async def update_doctor_bank_details_service(user_id: str, payload, db: AsyncSession):
+    """Admin: update a doctor's payout bank details by user_id."""
+    try:
+        result = await db.execute(select(Doctor).where(Doctor.user_id == user_id))
+        doctor = result.scalar_one_or_none()
+
+        if not doctor:
+            return api_response_error(
+                message="Doctor not found",
+                status_code=StatusCode.notFound,
+            )
+
+        doctor.bank_account_holder = payload.account_holder
+        doctor.bank_account_number = payload.account_number
+        doctor.bank_ifsc = payload.ifsc
+        doctor.bank_name = payload.bank_name
+        doctor.upi_id = payload.upi_id
+        await db.commit()
+        await db.refresh(doctor)
+
+        return api_response_success(
+            data=format_doctor_bank_data(doctor),
+            message="Doctor bank details updated successfully",
+            status_code=StatusCode.success,
+        )
+    except Exception as e:
+        await db.rollback()
+        return api_response_error(
+            message=f"Failed to update doctor bank details: {str(e)}",
             status_code=StatusCode.internalServerError,
         )

@@ -36,6 +36,13 @@ def format_doctor_data(doctor: Doctor) -> dict:
         "review_count": doctor.review_count or 0,
         "experience_years": doctor.experience_years or 0,
         "is_top_rated": (doctor.rating or 4.0) >= 4.5,
+        "has_bank_details": bool(doctor.bank_ifsc and doctor.bank_account_number),
+        "bank_account_holder": doctor.bank_account_holder or "",
+        "bank_account_number": _mask_account_number(doctor.bank_account_number),
+        "bank_ifsc": doctor.bank_ifsc or "",
+        "bank_name": doctor.bank_name or "",
+        "upi_id": doctor.upi_id or "",
+        "razorpayx_fund_account_id": doctor.razorpayx_fund_account_id or "",
     }
 
 
@@ -343,5 +350,116 @@ async def reset_password_service(payload, db: AsyncSession):
         await db.rollback()
         return api_response_error(
             message=f"Failed to reset password: {str(e)}",
+            status_code=StatusCode.internalServerError,
+        )
+
+
+# ─────────────────────── Bank details & payouts ───────────────────────
+
+def _mask_account_number(account_number: str | None) -> str:
+    if not account_number:
+        return ""
+    if len(account_number) <= 4:
+        return account_number
+    return "XXXX" + account_number[-4:]
+
+
+def format_doctor_bank_data(doctor: Doctor) -> dict:
+    return {
+        "account_holder": doctor.bank_account_holder or "",
+        "account_number": doctor.bank_account_number or "",
+        "ifsc": doctor.bank_ifsc or "",
+        "bank_name": doctor.bank_name or "",
+        "upi_id": doctor.upi_id or "",
+        "has_bank_details": bool(doctor.bank_ifsc and doctor.bank_account_number),
+        "razorpayx_contact_id": doctor.razorpayx_contact_id or "",
+        "razorpayx_fund_account_id": doctor.razorpayx_fund_account_id or "",
+    }
+
+
+async def get_bank_details_service(current_doctor, db: AsyncSession):
+    try:
+        return api_response_success(
+            data=format_doctor_bank_data(current_doctor),
+            message="Bank details fetched successfully",
+            status_code=StatusCode.success,
+        )
+    except Exception as e:
+        return api_response_error(
+            message=f"Failed to fetch bank details: {str(e)}",
+            status_code=StatusCode.internalServerError,
+        )
+
+
+async def update_bank_details_service(current_doctor, payload, db: AsyncSession):
+    try:
+        current_doctor.bank_account_holder = payload.account_holder
+        current_doctor.bank_account_number = payload.account_number
+        current_doctor.bank_ifsc = payload.ifsc
+        current_doctor.bank_name = payload.bank_name
+        current_doctor.upi_id = payload.upi_id
+        await db.commit()
+        await db.refresh(current_doctor)
+
+        return api_response_success(
+            data=format_doctor_bank_data(current_doctor),
+            message="Bank details saved. Payouts will be sent to this account.",
+            status_code=StatusCode.success,
+        )
+    except Exception as e:
+        await db.rollback()
+        return api_response_error(
+            message=f"Failed to save bank details: {str(e)}",
+            status_code=StatusCode.internalServerError,
+        )
+
+
+async def get_doctor_earnings_service(current_doctor, db: AsyncSession):
+    """Summarise the doctor's own consultation earnings and payout status."""
+    try:
+        from src.models.opd_appointment_model import OpdAppointment
+        from src.modules.patient.patient_query import appointment_to_dict
+
+        result = await db.execute(
+            select(OpdAppointment)
+            .where(
+                OpdAppointment.payment_status == "PAID",
+                OpdAppointment.doctor_name == current_doctor.user_name,
+            )
+            .order_by(OpdAppointment.updated_at.desc())
+        )
+        paid = result.scalars().all()
+
+        total_earned = 0
+        paid_out = 0
+        pending = 0
+        for appt in paid:
+            doctor_share = appt.doctor_share if appt.doctor_share is not None else 0
+            total_earned += doctor_share
+            if appt.payout_status == "PAID":
+                paid_out += doctor_share
+            else:
+                pending += doctor_share
+
+        return api_response_success(
+            data={
+                "bank": format_doctor_bank_data(current_doctor),
+                "summary": {
+                    "total_earned": total_earned,
+                    "paid_out": paid_out,
+                    "pending": pending,
+                    "payments_count": len(paid),
+                    "doctor_share_percent": paid[0].doctor_share_percent
+                    if paid and paid[0].doctor_share_percent is not None
+                    else 0,
+                },
+                "payments": [appointment_to_dict(a) for a in paid],
+            },
+            message="Earnings fetched successfully",
+            status_code=StatusCode.success,
+        )
+    except Exception as e:
+        return api_response_error(
+            message=f"Failed to fetch earnings: {str(e)}",
             status_code=StatusCode.internalServerError,
         )

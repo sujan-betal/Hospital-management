@@ -11,10 +11,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.models.doctor_model import Doctor
 from src.models.doctor_review_model import DoctorReview
 from src.models.invoice_model import Invoice
 from src.models.opd_appointment_model import OpdAppointment
 from src.models.patient_model import Patient
+from src.modules.hospital.hospital_query import get_or_create_settings
 from src.modules.patient.patient_query import (
     appointment_to_dict,
     clear_patient_otp,
@@ -647,6 +649,33 @@ def _razorpay_client():
     return razorpay.Client(auth=(key_id, key_secret)), key_id
 
 
+async def _attempt_appointment_payout(db: AsyncSession, appt: OpdAppointment):
+    """Snapshot the doctor's share and try to disburse it via RazorpayX.
+
+    Never raises: payout configuration problems leave the split recorded as
+    PENDING (admin settles manually) instead of blocking payment confirm.
+    """
+    from src.utils.razorpayx import attempt_doctor_payout
+
+    doctor = None
+    if appt.doctor_name:
+        result = await db.execute(
+            select(Doctor).where(Doctor.user_name == appt.doctor_name)
+        )
+        doctor = result.scalar_one_or_none()
+
+    status, payout_id, payout_error = await attempt_doctor_payout(
+        db, doctor, appt.doctor_share or 0, f"opd-{appt.appointment_id}"
+    )
+    appt.payout_status = status
+    appt.payout_id = payout_id
+    appt.payout_error = payout_error
+    if status == "PAID":
+        from datetime import datetime, timezone
+
+        appt.payout_date = datetime.now(timezone.utc)
+
+
 async def create_payment_order_service(
     current_patient, appointment_id: str, db: AsyncSession
 ):
@@ -774,6 +803,15 @@ async def verify_payment_service(
         appt.payment_signature = payload.razorpay_signature
 
         fee = appt.fee or 150
+        settings = await get_or_create_settings(db)
+        doctor_share_percent = settings.doctor_share_percent or 0
+        doctor_share = round(fee * doctor_share_percent / 100)
+        appt.doctor_share_percent = doctor_share_percent
+        appt.doctor_share = doctor_share
+        appt.admin_share = fee - doctor_share
+
+        await _attempt_appointment_payout(db, appt)
+
         invoice = Invoice(
             invoice_id=await generate_invoice_id(db),
             patient_name=appt.patient_name,

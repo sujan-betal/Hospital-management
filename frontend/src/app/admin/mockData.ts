@@ -1,6 +1,6 @@
 export interface Bed {
   id: string
-  ward: "ICU" | "Emergency" | "General Ward" | "Pediatrics" | "Maternity"
+  ward: string
   status: "available" | "occupied" | "sanitizing" | "reserved"
   price: number
   floor: number
@@ -14,7 +14,7 @@ export interface Admission {
   patientName: string
   patientAge: number
   patientGender: "Male" | "Female" | "Other"
-  wardType: "ICU" | "Emergency" | "General Ward" | "Pediatrics" | "Maternity"
+  wardType: string
   bedId: string
   admitDate: string
   dischargeDate: string

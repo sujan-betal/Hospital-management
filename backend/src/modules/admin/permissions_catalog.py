@@ -92,6 +92,11 @@ PERMISSION_CATALOG = [
                 "label": "Hospital Settings",
                 "description": "Manage hospital configuration and settings",
             },
+            {
+                "key": "PAYOUT_MANAGE",
+                "label": "Revenue & Payouts",
+                "description": "Configure the revenue split and manage doctor payout bank details",
+            },
         ],
     },
 ]

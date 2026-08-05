@@ -13,6 +13,7 @@ class HospitalSetting(Base):
     currency = Column(String, nullable=False, default="INR (Rs.)")
     copay_rate = Column(Integer, nullable=False, default=10)
     emergency_markup = Column(Integer, nullable=False, default=25)
+    doctor_share_percent = Column(Integer, nullable=False, default=30)
     auto_telemetry = Column(Boolean, nullable=False, default=True)
     sanitation_interval = Column(Integer, nullable=False, default=12)
     auto_dirty = Column(Boolean, nullable=False, default=True)

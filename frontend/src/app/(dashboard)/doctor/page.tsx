@@ -21,8 +21,18 @@ import {
   ChevronRight,
   LogOut,
   Stethoscope,
-  ChevronDown
+  ChevronDown,
+  Landmark,
+  Wallet,
+  IndianRupee,
+  Loader2,
+  Save
 } from "lucide-react"
+import {
+  getDoctorEarnings,
+  updateDoctorBankDetails,
+  type DoctorEarnings
+} from "@/services/doctor.service"
 
 // Types & Mock Data for Doctor Panel
 interface Appointment {
@@ -64,17 +74,68 @@ interface ConsultationHistory {
 }
 
 export default function DoctorDashboard() {
-  const [activeTab, setActiveTab] = useState<"schedule" | "prescriptions" | "lab-orders" | "consultations">("schedule")
+  const [activeTab, setActiveTab] = useState<"schedule" | "prescriptions" | "lab-orders" | "consultations" | "earnings">("schedule")
   const [currentTime, setCurrentTime] = useState("")
   const [authed, setAuthed] = useState(false)
+  const [earnings, setEarnings] = useState<DoctorEarnings | null>(null)
+  const [bankForm, setBankForm] = useState({
+    account_holder: "",
+    account_number: "",
+    ifsc: "",
+    bank_name: "",
+    upi_id: ""
+  })
+  const [loadingEarnings, setLoadingEarnings] = useState(true)
+  const [savingBank, setSavingBank] = useState(false)
+  const [bankMsg, setBankMsg] = useState("")
+
+  const loadEarnings = async () => {
+    setLoadingEarnings(true)
+    try {
+      const res = await getDoctorEarnings()
+      setEarnings(res.data)
+      const bank = res.data.bank
+      setBankForm({
+        account_holder: bank.account_holder || "",
+        account_number: bank.account_number || "",
+        ifsc: bank.ifsc || "",
+        bank_name: bank.bank_name || "",
+        upi_id: bank.upi_id || ""
+      })
+    } catch {
+      setEarnings(null)
+    } finally {
+      setLoadingEarnings(false)
+    }
+  }
 
   useEffect(() => {
     if (!localStorage.getItem("access_token")) {
       window.location.href = "/login"
     } else {
       setAuthed(true)
+      loadEarnings()
     }
   }, [])
+
+  const handleSaveBank = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSavingBank(true)
+    setBankMsg("")
+    try {
+      const res = await updateDoctorBankDetails({
+        ...bankForm,
+        bank_name: bankForm.bank_name || undefined,
+        upi_id: bankForm.upi_id || undefined
+      })
+      setBankMsg(res.message)
+      loadEarnings()
+    } catch (err: any) {
+      setBankMsg(err?.message || "Failed to save bank details")
+    } finally {
+      setSavingBank(false)
+    }
+  }
 
   // State lists
   const [appointments, setAppointments] = useState<Appointment[]>([
@@ -289,6 +350,17 @@ export default function DoctorDashboard() {
               <Video className="h-5 w-5 text-[#5C7D73] group-hover:text-white" />
               <span>Consultations</span>
             </button>
+
+            <button
+              onClick={() => setActiveTab("earnings")}
+              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-200 group relative ${
+                activeTab === "earnings" ? "bg-emerald-500 text-white font-semibold" : "text-[#8AA098] hover:text-white hover:bg-[#12463E]/30"
+              }`}
+            >
+              {activeTab === "earnings" && <span className="absolute left-0 top-3 bottom-3 w-1 bg-white rounded-r-md" />}
+              <Landmark className="h-5 w-5 text-[#5C7D73] group-hover:text-white" />
+              <span>Earnings & Payout</span>
+            </button>
           </nav>
         </div>
 
@@ -323,6 +395,7 @@ export default function DoctorDashboard() {
               {activeTab === "prescriptions" && "Prescription Pad"}
               {activeTab === "lab-orders" && "Laboratory Orders & Diagnostics"}
               {activeTab === "consultations" && "Specialist Consultations"}
+              {activeTab === "earnings" && "Earnings & Payout"}
             </h1>
             <p className="text-xs text-[#8AA098] mt-0.5">Welcome back, Dr. House. Medical console fully sync'd.</p>
           </div>
@@ -730,6 +803,213 @@ export default function DoctorDashboard() {
                     ))}
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* ─── TAB 5: EARNINGS & PAYOUT ─── */}
+          {activeTab === "earnings" && (
+            <div className="space-y-6">
+              {bankMsg && (
+                <div className={`px-4 py-3 rounded-2xl text-xs font-bold border ${
+                  bankMsg.includes("Failed") || bankMsg.includes("failed")
+                    ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                    : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                }`}>
+                  {bankMsg}
+                </div>
+              )}
+
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-xl font-bold text-white">Consultation Earnings</h2>
+                  <p className="text-xs text-[#8AA098] mt-1">
+                    Your share of every confirmed OPD payment. Disbursed automatically to your bank when RazorpayX payouts are enabled.
+                  </p>
+                </div>
+              </div>
+
+              {/* Earnings summary */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-[#0C1E1A] p-5 rounded-2xl border border-[#1B352E] flex items-center gap-4">
+                  <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-400">
+                    <Wallet className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs text-[#8AA098] uppercase tracking-wider font-semibold">Total Earned</h3>
+                    <p className="text-2xl font-bold text-white mt-1">
+                      Rs. {(earnings?.summary.total_earned ?? 0).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-[#0C1E1A] p-5 rounded-2xl border border-[#1B352E] flex items-center gap-4">
+                  <div className="p-3 bg-blue-500/10 rounded-xl text-blue-400">
+                    <CheckCircle className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs text-[#8AA098] uppercase tracking-wider font-semibold">Paid Out</h3>
+                    <p className="text-2xl font-bold text-white mt-1">
+                      Rs. {(earnings?.summary.paid_out ?? 0).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-[#0C1E1A] p-5 rounded-2xl border border-[#1B352E] flex items-center gap-4">
+                  <div className="p-3 bg-amber-500/10 rounded-xl text-amber-400">
+                    <Clock className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs text-[#8AA098] uppercase tracking-wider font-semibold">Pending Payout</h3>
+                    <p className="text-2xl font-bold text-white mt-1">
+                      Rs. {(earnings?.summary.pending ?? 0).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bank details form */}
+              <div className="bg-[#0C1E1A] border border-[#1B352E] rounded-3xl p-6">
+                <div className="flex items-center gap-3 border-b border-[#1B352E] pb-4 mb-5">
+                  <Landmark className="h-5 w-5 text-emerald-400" />
+                  <div>
+                    <h3 className="text-base font-bold text-white">Payout Bank Account</h3>
+                    <p className="text-[11px] text-[#8AA098]">
+                      {earnings?.bank.has_bank_details
+                        ? "Details saved — payouts will be sent to this account."
+                        : "Add your bank details to receive your consultation share."}
+                    </p>
+                  </div>
+                </div>
+
+                {loadingEarnings ? (
+                  <div className="flex items-center justify-center py-10 text-[#8AA098]">
+                    <Loader2 className="h-5 w-5 animate-spin mr-3 text-emerald-500" />
+                    <span className="text-sm font-semibold">Loading earnings...</span>
+                  </div>
+                ) : (
+                  <form onSubmit={handleSaveBank} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-emerald-400 block">Account Holder Name</label>
+                        <input
+                          required
+                          value={bankForm.account_holder}
+                          onChange={(e) => setBankForm({ ...bankForm, account_holder: e.target.value })}
+                          className="w-full bg-[#050E0C] border border-[#1B352E] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                          placeholder="Full name as on bank account"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-emerald-400 block">Account Number</label>
+                        <input
+                          required
+                          value={bankForm.account_number}
+                          onChange={(e) => setBankForm({ ...bankForm, account_number: e.target.value })}
+                          className="w-full bg-[#050E0C] border border-[#1B352E] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                          placeholder="9–18 digit account number"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-emerald-400 block">IFSC Code</label>
+                        <input
+                          required
+                          value={bankForm.ifsc}
+                          onChange={(e) => setBankForm({ ...bankForm, ifsc: e.target.value.toUpperCase() })}
+                          className="w-full bg-[#050E0C] border border-[#1B352E] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                          placeholder="11 chars, e.g. HDFC0001234"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-emerald-400 block">Bank Name</label>
+                        <input
+                          value={bankForm.bank_name}
+                          onChange={(e) => setBankForm({ ...bankForm, bank_name: e.target.value })}
+                          className="w-full bg-[#050E0C] border border-[#1B352E] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                          placeholder="e.g. HDFC Bank"
+                        />
+                      </div>
+                      <div className="space-y-1.5 md:col-span-2">
+                        <label className="text-xs font-semibold text-emerald-400 block">UPI ID (optional)</label>
+                        <input
+                          value={bankForm.upi_id}
+                          onChange={(e) => setBankForm({ ...bankForm, upi_id: e.target.value })}
+                          className="w-full bg-[#050E0C] border border-[#1B352E] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                          placeholder="name@bank"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={savingBank}
+                        className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/10"
+                      >
+                        {savingBank ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                        Save Bank Details
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+
+              {/* Earnings history */}
+              <div className="bg-[#0C1E1A] border border-[#1B352E] rounded-3xl overflow-hidden">
+                <div className="p-6 border-b border-[#1B352E] flex justify-between items-center bg-[#071310]/50">
+                  <div>
+                    <h2 className="text-lg font-bold text-white">Payment History</h2>
+                    <p className="text-xs text-[#8AA098] mt-1">
+                      {earnings?.summary.payments_count ?? 0} confirmed consultation{earnings?.summary.payments_count === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                </div>
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-[#071310]/50 border-b border-[#1B352E] text-xs font-bold text-[#8AA098] uppercase">
+                      <th className="p-4">Appointment</th>
+                      <th className="p-4">Patient</th>
+                      <th className="p-4">Date</th>
+                      <th className="p-4">Fee</th>
+                      <th className="p-4">Split</th>
+                      <th className="p-4">Your Share</th>
+                      <th className="p-4">Payout</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#1B352E]">
+                    {(earnings?.payments ?? []).length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="p-8 text-center text-xs text-[#5C7D73]">
+                          No confirmed payments yet — your share appears here after patients pay.
+                        </td>
+                      </tr>
+                    )}
+                    {(earnings?.payments ?? []).map((p) => (
+                      <tr key={p.appointment_id} className="text-sm hover:bg-[#12463E]/10 transition-all">
+                        <td className="p-4 font-mono text-emerald-400 font-semibold">{p.appointment_id}</td>
+                        <td className="p-4 font-bold text-white">{p.patient_name}</td>
+                        <td className="p-4 text-[#8AA098]">{p.date}</td>
+                        <td className="p-4 text-white font-semibold">Rs. {p.fee.toLocaleString()}</td>
+                        <td className="p-4 text-[#8AA098]">{p.doctor_share_percent}%</td>
+                        <td className="p-4 text-emerald-400 font-bold">Rs. {p.doctor_share.toLocaleString()}</td>
+                        <td className="p-4">
+                          {p.payout_status === "PAID" ? (
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full">
+                              <CheckCircle className="h-3 w-3" /> Paid {p.payout_date ? new Date(p.payout_date).toLocaleDateString() : ""}
+                            </span>
+                          ) : p.payout_status === "FAILED" ? (
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2.5 py-1 rounded-full">
+                              <AlertCircle className="h-3 w-3" /> Failed
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-1 rounded-full">
+                              <Clock className="h-3 w-3" /> Pending
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
