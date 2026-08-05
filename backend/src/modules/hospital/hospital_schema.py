@@ -93,6 +93,7 @@ class SettingsUpdateRequest(BaseModel):
     currency: str | None = Field(default=None, max_length=30)
     copay_rate: int | None = Field(default=None, ge=0, le=100)
     emergency_markup: int | None = Field(default=None, ge=0, le=500)
+    doctor_share_percent: int | None = Field(default=None, ge=0, le=100)
     auto_telemetry: bool | None = None
     sanitation_interval: int | None = Field(default=None, ge=1, le=168)
     auto_dirty: bool | None = None

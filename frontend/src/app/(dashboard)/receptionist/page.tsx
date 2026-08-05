@@ -18,6 +18,7 @@ import {
   Phone,
   Mail,
   Shield,
+  BedDouble,
 } from "lucide-react"
 import {
   listPatients,
@@ -30,6 +31,9 @@ import {
   createInvoice,
   updateInvoice,
   getDashboard,
+  listBeds,
+  updateBedStatus,
+  type Bed,
   type DoctorOption,
   type DashboardStats,
 } from "@/services/receptionist.service"
@@ -49,11 +53,14 @@ interface Patient {
 interface Appointment {
   id: string
   patientName: string
+  patientPhone: string
   doctorName: string
   specialty: string
   date: string
   time: string
-  status: "scheduled" | "checked-in" | "cancelled"
+  fee: number
+  paymentStatus: "paid" | "unpaid"
+  status: "scheduled" | "checked-in" | "completed" | "cancelled"
 }
 
 interface Invoice {
@@ -112,7 +119,7 @@ const mockDashboard: DashboardStats = {
 }
 
 export default function ReceptionistDashboard() {
-  const [activeTab, setActiveTab] = useState<"registration" | "appointments" | "billing" | "reports">("registration")
+  const [activeTab, setActiveTab] = useState<"registration" | "appointments" | "beds" | "billing" | "reports">("registration")
   const [currentTime, setCurrentTime] = useState("")
   const [authed, setAuthed] = useState(false)
 
@@ -131,17 +138,19 @@ export default function ReceptionistDashboard() {
   const [invoices, setInvoices] = useState<Invoice[]>(mockInvoices)
   const [doctors, setDoctors] = useState<DoctorOption[]>(mockDoctors)
   const [dashboard, setDashboard] = useState<DashboardStats | null>(mockDashboard)
+  const [beds, setBeds] = useState<Bed[]>([])
 
   useEffect(() => {
     let active = true
     async function load() {
       try {
-        const [pRes, aRes, iRes, dRes, dashRes] = await Promise.all([
+        const [pRes, aRes, iRes, dRes, dashRes, bedRes] = await Promise.all([
           listPatients(),
           listAppointments(),
           listInvoices(),
           listDoctors(),
           getDashboard(),
+          listBeds(),
         ])
         if (!active) return
 
@@ -162,11 +171,14 @@ export default function ReceptionistDashboard() {
           setAppointments(aRes.data.map((a) => ({
             id: a.appointment_id,
             patientName: a.patient_name,
-            doctorName: a.doctor_name,
+            patientPhone: a.patient_phone || "",
+          doctorName: a.doctor_name,
             specialty: a.specialty,
             date: a.date,
             time: a.time,
-            status: a.status.toLowerCase() as Appointment["status"],
+            fee: a.fee ?? 150,
+          paymentStatus: (a.payment_status || "UNPAID").toLowerCase() as Appointment["paymentStatus"],
+          status: a.status.toLowerCase() as Appointment["status"],
           })))
         }
 
@@ -184,6 +196,7 @@ export default function ReceptionistDashboard() {
 
         if (dRes.data.length) setDoctors(dRes.data)
         setDashboard(dashRes.data)
+        setBeds(bedRes.data)
       } catch (err: any) {
         console.error("Failed to load receptionist data", err)
       } finally {
@@ -220,6 +233,11 @@ export default function ReceptionistDashboard() {
     insuranceStatus: "uninsured" as "covered" | "uninsured" | "pending",
     items: [{ description: "", cost: 0 }]
   })
+
+  const [isBedBookOpen, setIsBedBookOpen] = useState(false)
+  const [bedBooking, setBedBooking] = useState({ bedId: "", patientName: "", status: "OCCUPIED" as "OCCUPIED" | "RESERVED" })
+  const [bedStatusFilter, setBedStatusFilter] = useState<string>("all")
+  const [bedWardFilter, setBedWardFilter] = useState<string>("all")
 
   const [searchTerm, setSearchTerm] = useState("")
 
@@ -286,10 +304,13 @@ export default function ReceptionistDashboard() {
       const created: Appointment = {
         id: res.data.appointment_id,
         patientName: res.data.patient_name,
+        patientPhone: res.data.patient_phone || selectedPatient?.phone || "",
         doctorName: res.data.doctor_name,
         specialty: res.data.specialty,
         date: res.data.date,
         time: res.data.time,
+        fee: res.data.fee ?? 150,
+        paymentStatus: (res.data.payment_status || "UNPAID").toLowerCase() as Appointment["paymentStatus"],
         status: "scheduled"
       }
 
@@ -366,10 +387,64 @@ export default function ReceptionistDashboard() {
     }
   }
 
+  const handleCompleteVisit = async (id: string) => {
+    try {
+      await updateAppointment(id, { status: "COMPLETED" })
+      setAppointments(appointments.map(a => a.id === id ? { ...a, status: "completed" as const } : a))
+    } catch (err: any) {
+      alert(err.message || "Failed to mark visit completed")
+    }
+  }
+
+  const handleConfirmBookBed = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!bedBooking.bedId) return
+
+    try {
+      const selectedPatient = patients.find(p => p.name === bedBooking.patientName)
+      const res = await updateBedStatus(bedBooking.bedId, {
+        status: bedBooking.status,
+        patient: selectedPatient?.name || bedBooking.patientName || null,
+      })
+      setBeds(beds.map(b => b.bed_id === bedBooking.bedId ? res.data : b))
+      setBedBooking({ bedId: "", patientName: "", status: "OCCUPIED" })
+      setIsBedBookOpen(false)
+    } catch (err: any) {
+      alert(err.message || "Failed to book bed")
+    }
+  }
+
+  const handleReleaseBed = async (bedId: string) => {
+    if (!window.confirm(`Release bed ${bedId}? The bed will be marked AVAILABLE.`)) return
+    try {
+      const res = await updateBedStatus(bedId, { status: "AVAILABLE" })
+      setBeds(beds.map(b => b.bed_id === bedId ? res.data : b))
+    } catch (err: any) {
+      alert(err.message || "Failed to release bed")
+    }
+  }
+
+  // Beds filtering (ward + status) for the front-desk bed console
+  const filteredBeds = useMemo(() => {
+    return beds.filter(b =>
+      (bedStatusFilter === "all" || b.status === bedStatusFilter) &&
+      (bedWardFilter === "all" || b.ward === bedWardFilter)
+    )
+  }, [beds, bedStatusFilter, bedWardFilter])
+
+  const bedWards = useMemo(() => Array.from(new Set(beds.map(b => b.ward))).sort(), [beds])
+  const bedCounts = useMemo(() => ({
+    total: beds.length,
+    available: beds.filter(b => b.status === "AVAILABLE").length,
+    occupied: beds.filter(b => b.status === "OCCUPIED").length,
+    sanitizing: beds.filter(b => b.status === "SANITIZING").length,
+    reserved: beds.filter(b => b.status === "RESERVED").length,
+  }), [beds])
+
   // Filtered patients search
   const filteredPatients = patients.filter(p =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.phone.includes(searchTerm) ||
+    (p.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (p.phone || "").includes(searchTerm) ||
     p.id.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
@@ -443,6 +518,17 @@ export default function ReceptionistDashboard() {
             </button>
 
             <button
+              onClick={() => setActiveTab("beds")}
+              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-200 group relative ${
+                activeTab === "beds" ? "bg-emerald-500 text-white font-semibold" : "text-[#8AA098] hover:text-white hover:bg-[#12463E]/30"
+              }`}
+            >
+              {activeTab === "beds" && <span className="absolute left-0 top-3 bottom-3 w-1 bg-white rounded-r-md" />}
+              <BedDouble className="h-5 w-5 text-[#5C7D73] group-hover:text-white" />
+              <span>Ward & Bed Console</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab("billing")}
               className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium transition-all duration-200 group relative ${
                 activeTab === "billing" ? "bg-emerald-500 text-white font-semibold" : "text-[#8AA098] hover:text-white hover:bg-[#12463E]/30"
@@ -495,6 +581,7 @@ export default function ReceptionistDashboard() {
             <h1 className="text-lg font-bold text-[#0B2B26] tracking-tight uppercase">
               {activeTab === "registration" && "Patient Registry"}
               {activeTab === "appointments" && "Doctor Scheduling & Appointments"}
+              {activeTab === "beds" && "Ward & Bed Availability"}
               {activeTab === "billing" && "Billing Entry & Ledger"}
               {activeTab === "reports" && "Operational Reports & KPI Telemetry"}
             </h1>
@@ -606,10 +693,15 @@ export default function ReceptionistDashboard() {
                       <div>
                         <h3 className="font-bold text-[#0B2B26] text-base">{appt.patientName}</h3>
                         <p className="text-xs text-[#8AA098] mt-1 font-mono">{appt.id}</p>
+                        {appt.patientPhone && (
+                          <p className="text-xs text-[#8AA098] mt-0.5 font-mono">📞 {appt.patientPhone}</p>
+                        )}
                       </div>
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                        appt.status === "checked-in" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
-                        "bg-[#EEF4F1] text-[#6B8078] border border-[#D7E2DC]"
+                        appt.status === "checked-in" ? "bg-sky-50 text-sky-700 border border-sky-200" :
+                        appt.status === "completed" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                        appt.status === "cancelled" ? "bg-rose-50 text-rose-700 border border-rose-200" :
+                        "bg-amber-50 text-amber-700 border border-amber-200"
                       }`}>
                         {appt.status}
                       </span>
@@ -632,6 +724,17 @@ export default function ReceptionistDashboard() {
                         <span className="font-semibold">Consultation Slot:</span>
                         <span className="font-bold text-emerald-700">{appt.time}</span>
                       </div>
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold">Fee / Payment:</span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="font-mono">₹{appt.fee}</span>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            appt.paymentStatus === "paid" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                          }`}>
+                            {appt.paymentStatus}
+                          </span>
+                        </span>
+                      </div>
                     </div>
 
                     {appt.status === "scheduled" && (
@@ -642,13 +745,159 @@ export default function ReceptionistDashboard() {
                         <CheckCircle className="h-4 w-4" /> Check In Patient
                       </button>
                     )}
+                    {appt.status === "checked-in" && (
+                      <button
+                        onClick={() => handleCompleteVisit(appt.id)}
+                        className="w-full mt-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1"
+                      >
+                        <CheckCircle className="h-4 w-4" /> Mark Visit Completed
+                      </button>
+                    )}
+                    {appt.status === "completed" && (
+                      <p className="w-full mt-5 py-2.5 text-center text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl">
+                        Consultation completed — patient can now rate the doctor
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* ─── TAB 3: BILLING & INVOICES ─── */}
+          {/* ─── TAB 3: WARD & BED CONSOLE ─── */}
+          {activeTab === "beds" && (
+            <div className="space-y-6">
+              {/* Bed occupancy summary */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="bg-white p-5 rounded-3xl border border-[#E8ECEB] shadow-xs">
+                  <h4 className="text-[11px] font-semibold text-[#8AA098] uppercase tracking-wider">Total Beds</h4>
+                  <p className="text-3xl font-black text-[#0B2B26] mt-1.5">{bedCounts.total}</p>
+                </div>
+                <div className="bg-white p-5 rounded-3xl border border-[#E8ECEB] shadow-xs">
+                  <h4 className="text-[11px] font-semibold text-[#8AA098] uppercase tracking-wider">Available</h4>
+                  <p className="text-3xl font-black text-emerald-600 mt-1.5">{bedCounts.available}</p>
+                </div>
+                <div className="bg-white p-5 rounded-3xl border border-[#E8ECEB] shadow-xs">
+                  <h4 className="text-[11px] font-semibold text-[#8AA098] uppercase tracking-wider">Occupied</h4>
+                  <p className="text-3xl font-black text-sky-600 mt-1.5">{bedCounts.occupied}</p>
+                </div>
+                <div className="bg-white p-5 rounded-3xl border border-[#E8ECEB] shadow-xs">
+                  <h4 className="text-[11px] font-semibold text-[#8AA098] uppercase tracking-wider">Reserved</h4>
+                  <p className="text-3xl font-black text-rose-600 mt-1.5">{bedCounts.reserved}</p>
+                </div>
+                <div className="bg-white p-5 rounded-3xl border border-[#E8ECEB] shadow-xs">
+                  <h4 className="text-[11px] font-semibold text-[#8AA098] uppercase tracking-wider">Sanitizing</h4>
+                  <p className="text-3xl font-black text-amber-600 mt-1.5">{bedCounts.sanitizing}</p>
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-5 rounded-3xl border border-[#E8ECEB] shadow-xs">
+                <div>
+                  <h3 className="font-bold text-[#0B2B26] text-base">Bed Availability Board</h3>
+                  <p className="text-xs text-[#6B8078] mt-1">View ward-wise availability and book or release beds from the front desk</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <select
+                    value={bedWardFilter}
+                    onChange={(e) => setBedWardFilter(e.target.value)}
+                    className="h-10 px-3 rounded-xl border border-[#D7E2DC] bg-[#F6F8F7] text-xs font-semibold text-[#12463E] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                  >
+                    <option value="all">All Wards</option>
+                    {bedWards.map(w => <option key={w} value={w}>{w}</option>)}
+                  </select>
+                  <div className="flex bg-[#F6F8F7] border border-[#D7E2DC] p-1 rounded-xl">
+                    {["all", "AVAILABLE", "OCCUPIED", "RESERVED", "SANITIZING"].map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setBedStatusFilter(s)}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all ${
+                          bedStatusFilter === s ? "bg-emerald-500 text-white shadow-sm" : "text-[#6B8078] hover:text-[#12463E]"
+                        }`}
+                      >
+                        {s === "all" ? "All" : s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Beds grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                {filteredBeds.map((bed) => (
+                  <div key={bed.bed_id} className="bg-white border border-[#E8ECEB] rounded-3xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col">
+                    <div className="flex items-start justify-between border-b border-[#E8ECEB] pb-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                          bed.status === "AVAILABLE" ? "bg-emerald-50 text-emerald-600" :
+                          bed.status === "OCCUPIED" ? "bg-sky-50 text-sky-600" :
+                          bed.status === "RESERVED" ? "bg-rose-50 text-rose-600" :
+                          "bg-amber-50 text-amber-600"
+                        }`}>
+                          <BedDouble className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-[#0B2B26] text-base font-mono">{bed.bed_id}</h3>
+                          <p className="text-[11px] text-[#8AA098] font-medium">{bed.ward} · Floor {bed.floor}</p>
+                        </div>
+                      </div>
+                      <span className={`px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider border ${
+                        bed.status === "AVAILABLE" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                        bed.status === "OCCUPIED" ? "bg-sky-50 text-sky-700 border-sky-200" :
+                        bed.status === "RESERVED" ? "bg-rose-50 text-rose-700 border-rose-200" :
+                        "bg-amber-50 text-amber-700 border-amber-200"
+                      }`}>
+                        {bed.status}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 space-y-2 text-xs text-[#4B5F58] flex-1">
+                      <div className="flex justify-between">
+                        <span className="font-semibold text-[#8AA098]">Patient:</span>
+                        <span className={`font-bold ${bed.patient ? "text-[#0B2B26]" : "text-[#9CAEA6]"}`}>
+                          {bed.patient || "— vacant —"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-semibold text-[#8AA098]">Rate:</span>
+                        <span className="font-mono font-bold">₹{bed.price}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-semibold text-[#8AA098]">Assigned Nurse:</span>
+                        <span>{bed.assigned_nurse || "—"}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-[#E8ECEB]">
+                      {bed.status === "AVAILABLE" || bed.status === "SANITIZING" ? (
+                        <button
+                          onClick={() => { setBedBooking({ bedId: bed.bed_id, patientName: "", status: "OCCUPIED" }); setIsBedBookOpen(true) }}
+                          className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold transition-all shadow-sm flex items-center justify-center gap-1"
+                        >
+                          <Plus className="h-4 w-4" /> Book Bed
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleReleaseBed(bed.bed_id)}
+                          className="w-full py-2.5 bg-[#12463E] hover:bg-[#0B2B26] text-white rounded-xl text-xs font-semibold transition-all shadow-sm flex items-center justify-center gap-1"
+                        >
+                          <CheckCircle className="h-4 w-4" /> Release Bed
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {filteredBeds.length === 0 && (
+                  <div className="col-span-full bg-white border border-dashed border-[#D7E2DC] rounded-3xl p-10 text-center">
+                    <p className="text-sm font-semibold text-[#6B8078]">No beds match the selected filters.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ─── TAB 4: BILLING & INVOICES ─── */}
           {activeTab === "billing" && (
             <div className="space-y-6">
               <div className="flex justify-between items-center">
@@ -1142,6 +1391,74 @@ export default function ReceptionistDashboard() {
                   className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold transition-all shadow-md shadow-emerald-500/10"
                 >
                   Dispatch Invoice
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL: BOOK BED ─── */}
+      {isBedBookOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white border border-[#E8ECEB] rounded-3xl w-full max-w-md p-6 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-[#E8ECEB] pb-4">
+              <h3 className="text-lg font-bold text-[#0B2B26] flex items-center gap-2">
+                <BedDouble className="h-5 w-5 text-emerald-500" /> Book Bed {bedBooking.bedId}
+              </h3>
+              <button
+                onClick={() => setIsBedBookOpen(false)}
+                className="text-[#8AA098] hover:text-[#0B2B26] transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmBookBed} className="space-y-4 mt-4">
+              <div>
+                <label className="text-xs font-semibold text-[#12463E] block mb-1">Assign Patient</label>
+                <select
+                  value={bedBooking.patientName}
+                  onChange={(e) => setBedBooking({ ...bedBooking, patientName: e.target.value })}
+                  className="w-full bg-[#F6F8F7] border border-[#D7E2DC] rounded-xl px-4 py-3 text-sm text-[#0B2B26] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                >
+                  <option value="">-- Choose registered patient --</option>
+                  {patients.map(p => (
+                    <option key={p.id} value={p.name}>{p.name} ({p.id})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-[#12463E] block mb-1">Booking Type</label>
+                <select
+                  value={bedBooking.status}
+                  onChange={(e) => setBedBooking({ ...bedBooking, status: e.target.value as "OCCUPIED" | "RESERVED" })}
+                  className="w-full bg-[#F6F8F7] border border-[#D7E2DC] rounded-xl px-4 py-3 text-sm text-[#0B2B26] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                >
+                  <option value="OCCUPIED">Occupied (patient admitted)</option>
+                  <option value="RESERVED">Reserved (bed blocked)</option>
+                </select>
+              </div>
+
+              <div className="bg-[#EEF4F1] border border-[#D7E2DC] rounded-xl p-3 text-xs text-[#12463E]">
+                This update is instantly reflected on the Admin dashboard — ward managers can see the bed as
+                <strong> {bedBooking.status}</strong>.
+              </div>
+
+              <div className="flex justify-end gap-2 border-t border-[#E8ECEB] pt-4 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setIsBedBookOpen(false)}
+                  className="px-4 py-2 bg-transparent hover:bg-[#EEF4F1] text-[#6B8078] rounded-xl text-xs font-semibold transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold transition-all shadow-md shadow-emerald-500/10"
+                >
+                  Book Bed
                 </button>
               </div>
             </form>

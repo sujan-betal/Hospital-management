@@ -1,14 +1,15 @@
 """Business logic for the Receptionist module.
 
-Front-desk operations — patient registration, OPD appointment booking and
-billing entry — are managed from here. Low-level DB helpers live in
-`receptionist_query.py`.
+Front-desk operations — OPD appointment booking and billing entry — are
+managed from here. Low-level DB helpers live in `receptionist_query.py`.
 """
 
 import json
-from datetime import date
+import os
+from datetime import date, timedelta
 
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.admission_model import Admission
@@ -23,31 +24,45 @@ from src.modules.receptionist.receptionist_query import (
     appointment_to_dict,
     find_appointment_by_id,
     find_invoice_by_id,
-    find_patient_by_phone,
-    find_patient_by_user_id,
     generate_appointment_id,
     generate_invoice_id,
     invoice_to_dict,
-    patient_to_dict,
 )
+from src.modules.hospital.hospital_query import bed_to_dict, find_bed_by_id
+from src.modules.hospital.hospital_service import VALID_BED_STATUSES
 from src.utils.common_schema import api_response_success, api_response_error
-from src.utils.security import get_password_hash
+from src.utils.email import send_password_reset_email
+from src.utils.security import create_access_token, get_password_hash
 from src.utils.status_code import StatusCode
 
-VALID_PATIENT_STATUSES = {"ACTIVE", "INACTIVE", "SUSPENDED"}
-VALID_APPOINTMENT_STATUSES = {"SCHEDULED", "CHECKED-IN", "CANCELLED"}
+VALID_APPOINTMENT_STATUSES = {"SCHEDULED", "CHECKED-IN", "COMPLETED", "CANCELLED"}
 VALID_INSURANCE_STATUSES = {"COVERED", "UNINSURED", "PENDING"}
 VALID_PAYMENT_STATUSES = {"PAID", "UNPAID"}
+
+RESET_TOKEN_EXPIRE_MINUTES = int(os.getenv("RESET_TOKEN_EXPIRE_MINUTES", "30"))
+FRONTEND_URI = os.getenv("FRONTEND_URI", "http://localhost:3000")
 
 
 def _today() -> str:
     return date.today().isoformat()
 
 
+def _build_reset_link(token: str) -> str:
+    return f"{FRONTEND_URI}/reset-password?token={token}"
+
+
+def _create_reset_token(user_id, role: str) -> str:
+    return create_access_token(
+        subject=user_id,
+        role=role,
+        expires_delta=timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES),
+    )
+
+
 # ─────────────────────── Receptionist Account ───────────────────────
 
 async def create_receptionist_service(payload, db: AsyncSession):
-    """Admin-only: create a receptionist account for the front desk."""
+    """Admin-only: create a receptionist account and email a password-set link."""
     try:
         query = select(Receptionist).where(
             or_(
@@ -69,16 +84,44 @@ async def create_receptionist_service(payload, db: AsyncSession):
                 status_code=StatusCode.conflict,
             )
 
+        # No usable password yet: the receptionist must set one via the
+        # emailed link, mirroring the doctor account flow.
         receptionist = Receptionist(
             user_name=payload.user_name,
             email=payload.email,
-            password=get_password_hash(payload.password),
+            password=get_password_hash(os.urandom(24).hex()),
             role="RECEPTIONIST",
             status="ACTIVE",
+            is_reset=True,
         )
         db.add(receptionist)
         await db.commit()
         await db.refresh(receptionist)
+
+        # user_id is only assigned after commit, so build the reset token now
+        # to avoid embedding "None" as the UUID in the emailed link.
+        reset_token = _create_reset_token(receptionist.user_id, "RECEPTIONIST")
+        receptionist.token = reset_token
+        await db.commit()
+        await db.refresh(receptionist)
+
+        reset_link = _build_reset_link(reset_token)
+        delivered = send_password_reset_email(
+            to_email=receptionist.email,
+            full_name=receptionist.user_name,
+            reset_link=reset_link,
+            reset_minutes=RESET_TOKEN_EXPIRE_MINUTES,
+            login_email=receptionist.email,
+            login_username=receptionist.user_name,
+        )
+
+        message = (
+            "Receptionist account created. A password-set email has been sent to "
+            f"{receptionist.email}."
+            if delivered
+            else "Receptionist account created, but the password-set email could not be sent "
+                 "to the receptionist. Check the backend SMTP/console logs."
+        )
 
         return api_response_success(
             data={
@@ -89,7 +132,7 @@ async def create_receptionist_service(payload, db: AsyncSession):
                 "role": receptionist.role,
                 "status": receptionist.status,
             },
-            message="Receptionist account created successfully",
+            message=message,
             status_code=StatusCode.create,
         )
     except Exception as e:
@@ -100,142 +143,44 @@ async def create_receptionist_service(payload, db: AsyncSession):
         )
 
 
-# ─────────────────────── Patient Registration ───────────────────────
+# ─────────────────────── Ward / Bed Management ───────────────────────
 
-async def list_patients_service(db: AsyncSession):
+async def update_bed_status_service(bed_id: str, payload, db: AsyncSession):
+    """Front-desk bed action: book (OCCUPIED/RESERVED) or release (AVAILABLE).
+
+    Receptionists can only change a bed's status and the patient assigned to
+    it — ward, price, floor and equipment remain admin-managed. Any update is
+    written to the same `beds` table the admin dashboard reads, so admin sees
+    the receptionist's changes immediately.
+    """
     try:
-        patients = (
-            (await db.execute(
-                select(Patient).order_by(Patient.created_at.desc())
-            ))
-            .scalars()
-            .all()
-        )
-        return api_response_success(
-            data=[patient_to_dict(p) for p in patients],
-            message="Patients fetched successfully",
-            status_code=StatusCode.success,
-        )
-    except Exception as e:
-        return api_response_error(
-            message=f"Failed to fetch patients: {str(e)}",
-            status_code=StatusCode.internalServerError,
-        )
-
-
-async def create_patient_service(payload, db: AsyncSession):
-    try:
-        if await find_patient_by_phone(db, payload.phone):
+        bed = await find_bed_by_id(db, bed_id)
+        if not bed:
             return api_response_error(
-                message="A patient with this phone number is already registered",
-                status_code=StatusCode.conflict,
-            )
-
-        if payload.user_name:
-            result = await db.execute(
-                select(Patient).where(Patient.user_name == payload.user_name)
-            )
-            if result.scalar_one_or_none():
-                return api_response_error(
-                    message="Username already exists",
-                    status_code=StatusCode.conflict,
-                )
-
-        patient = Patient(
-            user_name=payload.user_name,
-            email=payload.email or None,
-            phone=payload.phone,
-            password=None,
-            age=payload.age,
-            gender=payload.gender,
-            insurance_provider=payload.insurance_provider,
-            role="PATIENT",
-            status="ACTIVE",
-        )
-        db.add(patient)
-        await db.commit()
-        await db.refresh(patient)
-
-        return api_response_success(
-            data=patient_to_dict(patient),
-            message=f"Patient {patient.user_name} registered successfully",
-            status_code=StatusCode.create,
-        )
-    except Exception as e:
-        await db.rollback()
-        return api_response_error(
-            message=f"Failed to register patient: {str(e)}",
-            status_code=StatusCode.internalServerError,
-        )
-
-
-async def update_patient_service(user_id, payload, db: AsyncSession):
-    try:
-        patient = await find_patient_by_user_id(db, user_id)
-        if not patient:
-            return api_response_error(
-                message="Patient not found",
+                message="Bed not found",
                 status_code=StatusCode.notFound,
             )
 
-        if payload.phone is not None and payload.phone != patient.phone:
-            if await find_patient_by_phone(db, payload.phone):
-                return api_response_error(
-                    message="A patient with this phone number is already registered",
-                    status_code=StatusCode.conflict,
-                )
-            patient.phone = payload.phone
+        if payload.status and payload.status.upper() in VALID_BED_STATUSES:
+            bed.status = payload.status.upper()
+        if payload.patient is not None:
+            bed.patient = payload.patient
 
-        if payload.user_name is not None:
-            patient.user_name = payload.user_name
-        if payload.email is not None:
-            patient.email = payload.email or None
-        if payload.age is not None:
-            patient.age = payload.age
-        if payload.gender is not None:
-            patient.gender = payload.gender
-        if payload.insurance_provider is not None:
-            patient.insurance_provider = payload.insurance_provider
-        if payload.status is not None and payload.status.upper() in VALID_PATIENT_STATUSES:
-            patient.status = payload.status.upper()
+        if bed.status == "AVAILABLE":
+            bed.patient = None
 
         await db.commit()
-        await db.refresh(patient)
+        await db.refresh(bed)
 
         return api_response_success(
-            data=patient_to_dict(patient),
-            message="Patient updated successfully",
+            data=bed_to_dict(bed),
+            message=f"Bed {bed.bed_id} marked {bed.status}",
             status_code=StatusCode.success,
         )
     except Exception as e:
         await db.rollback()
         return api_response_error(
-            message=f"Failed to update patient: {str(e)}",
-            status_code=StatusCode.internalServerError,
-        )
-
-
-async def delete_patient_service(user_id, db: AsyncSession):
-    try:
-        patient = await find_patient_by_user_id(db, user_id)
-        if not patient:
-            return api_response_error(
-                message="Patient not found",
-                status_code=StatusCode.notFound,
-            )
-
-        await db.delete(patient)
-        await db.commit()
-
-        return api_response_success(
-            data=None,
-            message="Patient record deleted permanently",
-            status_code=StatusCode.success,
-        )
-    except Exception as e:
-        await db.rollback()
-        return api_response_error(
-            message=f"Failed to delete patient: {str(e)}",
+            message=f"Failed to update bed: {str(e)}",
             status_code=StatusCode.internalServerError,
         )
 
@@ -259,6 +204,10 @@ async def list_doctors_service(db: AsyncSession):
                 "department": doc.department,
                 "email": doc.email,
                 "phone": doc.phone,
+                "rating": round(float(doc.rating), 1) if doc.rating is not None else 4.0,
+                "review_count": doc.review_count or 0,
+                "experience_years": doc.experience_years or 0,
+                "is_top_rated": (doc.rating or 4.0) >= 4.5,
             }
             for doc in doctors
         ]
@@ -303,6 +252,29 @@ async def list_appointments_service(db: AsyncSession):
 
 async def create_appointment_service(payload, db: AsyncSession):
     try:
+        existing_slot = (
+            (
+                await db.execute(
+                    select(OpdAppointment).where(
+                        OpdAppointment.doctor_name == payload.doctor_name,
+                        OpdAppointment.date == payload.date,
+                        OpdAppointment.time == payload.time,
+                        OpdAppointment.status != "CANCELLED",
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if existing_slot:
+            return api_response_error(
+                message=(
+                    f"This time slot is already booked for {payload.doctor_name} "
+                    f"on {payload.date}. Please pick another time."
+                ),
+                status_code=StatusCode.conflict,
+            )
+
         appt = OpdAppointment(
             appointment_id=await generate_appointment_id(db),
             patient_name=payload.patient_name,
@@ -314,7 +286,17 @@ async def create_appointment_service(payload, db: AsyncSession):
             status=payload.status.upper() if payload.status else "SCHEDULED",
         )
         db.add(appt)
-        await db.commit()
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            return api_response_error(
+                message=(
+                    f"This time slot was just booked for {payload.doctor_name} "
+                    f"on {payload.date}. Please pick another time."
+                ),
+                status_code=StatusCode.conflict,
+            )
         await db.refresh(appt)
 
         return api_response_success(
@@ -339,6 +321,38 @@ async def update_appointment_service(appointment_id: str, payload, db: AsyncSess
                 status_code=StatusCode.notFound,
             )
 
+        new_doctor = payload.doctor_name if payload.doctor_name is not None else appt.doctor_name
+        new_date = payload.date if payload.date is not None else appt.date
+        new_time = payload.time if payload.time is not None else appt.time
+        if (
+            payload.doctor_name is not None
+            or payload.date is not None
+            or payload.time is not None
+        ):
+            conflict = (
+                (
+                    await db.execute(
+                        select(OpdAppointment).where(
+                            OpdAppointment.doctor_name == new_doctor,
+                            OpdAppointment.date == new_date,
+                            OpdAppointment.time == new_time,
+                            OpdAppointment.status != "CANCELLED",
+                            OpdAppointment.appointment_id != appointment_id,
+                        )
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            if conflict:
+                return api_response_error(
+                    message=(
+                        f"This time slot is already booked for {new_doctor} "
+                        f"on {new_date}. Please pick another time."
+                    ),
+                    status_code=StatusCode.conflict,
+                )
+
         if payload.patient_name is not None:
             appt.patient_name = payload.patient_name
         if payload.patient_phone is not None:
@@ -354,7 +368,17 @@ async def update_appointment_service(appointment_id: str, payload, db: AsyncSess
         if payload.status is not None and payload.status.upper() in VALID_APPOINTMENT_STATUSES:
             appt.status = payload.status.upper()
 
-        await db.commit()
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            return api_response_error(
+                message=(
+                    f"This time slot was just booked for {new_doctor} "
+                    f"on {new_date}. Please pick another time."
+                ),
+                status_code=StatusCode.conflict,
+            )
         await db.refresh(appt)
 
         return api_response_success(
@@ -428,6 +452,7 @@ async def create_invoice_service(payload, db: AsyncSession):
         invoice = Invoice(
             invoice_id=await generate_invoice_id(db),
             patient_name=payload.patient_name,
+            patient_phone=payload.patient_phone or None,
             date=payload.date,
             amount=amount,
             items=json.dumps(items),
@@ -466,6 +491,8 @@ async def update_invoice_service(invoice_id: str, payload, db: AsyncSession):
 
         if payload.patient_name is not None:
             invoice.patient_name = payload.patient_name
+        if payload.patient_phone is not None:
+            invoice.patient_phone = payload.patient_phone or None
         if payload.date is not None:
             invoice.date = payload.date
         if payload.items is not None:

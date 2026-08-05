@@ -1,6 +1,6 @@
 export interface Bed {
   id: string
-  ward: "ICU" | "Emergency" | "General Ward" | "Pediatrics" | "Maternity"
+  ward: string
   status: "available" | "occupied" | "sanitizing" | "reserved"
   price: number
   floor: number
@@ -14,7 +14,7 @@ export interface Admission {
   patientName: string
   patientAge: number
   patientGender: "Male" | "Female" | "Other"
-  wardType: "ICU" | "Emergency" | "General Ward" | "Pediatrics" | "Maternity"
+  wardType: string
   bedId: string
   admitDate: string
   dischargeDate: string
@@ -89,6 +89,7 @@ export const initialMedicalTasks: MedicalTask[] = [
 export interface StaffCredential {
   id: string
   user_id?: string
+  admin_id?: number
   fullName: string
   role: "doctor" | "receptionist" | "subadmin" | "admin"
   email: string
@@ -98,6 +99,7 @@ export interface StaffCredential {
   status: "active" | "suspended" | "inactive"
   createdAt: string
   lastLogin: string | null
+  permissions?: string[]
 }
 
 export const initialStaffCredentials: StaffCredential[] = [

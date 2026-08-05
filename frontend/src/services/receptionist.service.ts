@@ -1,18 +1,13 @@
 import { api } from "@/lib/api"
+import {
+  listPatients,
+  updatePatient,
+  deletePatient,
+  createPatient as createPatientService,
+  type Patient,
+} from "@/services/patient.service"
 
-export interface Patient {
-  id: number
-  user_id: string
-  user_name: string
-  name: string
-  email: string
-  phone: string
-  age: number | null
-  gender: string | null
-  insurance_provider: string
-  status: string
-  created_at: string | null
-}
+export { listPatients, updatePatient, deletePatient }
 
 export interface PatientPayload {
   user_name: string
@@ -41,7 +36,9 @@ export interface Appointment {
   specialty: string
   date: string
   time: string
-  status: "SCHEDULED" | "CHECKED-IN" | "CANCELLED"
+  fee: number
+  payment_status: string
+  status: "SCHEDULED" | "CHECKED-IN" | "COMPLETED" | "CANCELLED"
 }
 
 export interface AppointmentPayload {
@@ -92,6 +89,25 @@ export interface DashboardStats {
   admitted: number
 }
 
+export interface Bed {
+  id: number
+  bed_id: string
+  ward: string
+  status: "AVAILABLE" | "OCCUPIED" | "SANITIZING" | "RESERVED"
+  price: number
+  floor: number
+  assigned_nurse: string | null
+  equipment: string[]
+  patient: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface BedStatusUpdatePayload {
+  status?: string
+  patient?: string
+}
+
 export interface ApiResponse<T> {
   data: T
   success: boolean
@@ -99,22 +115,10 @@ export interface ApiResponse<T> {
   message: string
 }
 
-// ─── Patients ───────────────────────────────────────────────
-
-export async function listPatients() {
-  return api.get<ApiResponse<Patient[]>>("/api/receptionist/patients")
-}
+// ─── Patients (owned by the Patient module) ─────────────────────
 
 export async function registerPatient(payload: PatientPayload) {
-  return api.post<ApiResponse<Patient>>("/api/receptionist/patients", payload)
-}
-
-export async function updatePatient(userId: string, payload: Partial<PatientPayload>) {
-  return api.put<ApiResponse<Patient>>(`/api/receptionist/patients/${userId}`, payload)
-}
-
-export async function deletePatient(userId: string) {
-  return api.delete<ApiResponse<null>>(`/api/receptionist/patients/${userId}`)
+  return createPatientService(payload)
 }
 
 // ─── Doctors ────────────────────────────────────────────────
@@ -163,4 +167,14 @@ export async function deleteInvoice(invoiceId: string) {
 
 export async function getDashboard() {
   return api.get<ApiResponse<DashboardStats>>("/api/receptionist/dashboard")
+}
+
+// ─── Ward / Bed Management ──────────────────────────────────
+
+export async function listBeds() {
+  return api.get<ApiResponse<Bed[]>>("/api/receptionist/beds")
+}
+
+export async function updateBedStatus(bedId: string, payload: BedStatusUpdatePayload) {
+  return api.put<ApiResponse<Bed>>(`/api/receptionist/beds/${bedId}`, payload)
 }

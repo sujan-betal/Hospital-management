@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, Float
 from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
@@ -34,6 +34,25 @@ class Doctor(Base):
         String,
         nullable=True
     )
+    rating = Column(
+        Float,
+        nullable=True
+    )
+    review_count = Column(
+        Integer,
+        nullable=True
+    )
+    experience_years = Column(
+        Integer,
+        nullable=True
+    )
+    bank_account_holder = Column(String, nullable=True)
+    bank_account_number = Column(String, nullable=True)
+    bank_ifsc = Column(String, nullable=True)
+    bank_name = Column(String, nullable=True)
+    upi_id = Column(String, nullable=True)
+    razorpayx_contact_id = Column(String, nullable=True)
+    razorpayx_fund_account_id = Column(String, nullable=True)
     token = Column(
         Text, nullable=True)
     is_reset = Column(

@@ -1,8 +1,7 @@
 """Pydantic request schemas for the Receptionist module.
 
-Front-desk operations — patient registration, OPD appointment booking and
-billing entry — are consolidated here so the whole receptionist domain lives
-under one schema module.
+Front-desk operations — OPD appointment booking and billing entry — are
+consolidated here. Patient schemas live in the Patient module.
 """
 
 from pydantic import BaseModel, EmailStr, Field
@@ -16,25 +15,16 @@ class ReceptionistCreateRequest(BaseModel):
     password: str = Field(..., min_length=6)
 
 
-# ─────────────────────── Patient Registration ───────────────────────
+# ─────────────────────── Ward / Bed Management ───────────────────────
 
-class PatientCreateRequest(BaseModel):
-    user_name: str = Field(..., min_length=2, max_length=100)
-    email: str = Field(default="", max_length=120)
-    phone: str = Field(..., min_length=6, max_length=30)
-    age: int | None = Field(default=None, ge=0, le=150)
-    gender: str | None = Field(default=None, max_length=20)
-    insurance_provider: str | None = Field(default=None, max_length=120)
+class ReceptionistBedUpdateRequest(BaseModel):
+    """Front-desk bed action — book (occupy/reserve) or release a bed.
 
-
-class PatientUpdateRequest(BaseModel):
-    user_name: str | None = Field(default=None, min_length=2, max_length=100)
-    email: str | None = Field(default=None, max_length=120)
-    phone: str | None = Field(default=None, min_length=6, max_length=30)
-    age: int | None = Field(default=None, ge=0, le=150)
-    gender: str | None = Field(default=None, max_length=20)
-    insurance_provider: str | None = Field(default=None, max_length=120)
+    Receptionists are intentionally limited to the status and the patient
+    occupying the bed; ward, price, floor and equipment stay admin-managed.
+    """
     status: str | None = Field(default=None, max_length=20)
+    patient: str | None = Field(default=None, max_length=100)
 
 
 # ─────────────────────── OPD Appointments ───────────────────────
@@ -68,6 +58,7 @@ class InvoiceItem(BaseModel):
 
 class InvoiceCreateRequest(BaseModel):
     patient_name: str = Field(..., min_length=2, max_length=100)
+    patient_phone: str | None = Field(default=None, max_length=30)
     date: str = Field(..., min_length=4, max_length=30)
     items: list[InvoiceItem] = Field(default_factory=list)
     insurance_status: str = Field(default="UNINSURED", max_length=20)
@@ -76,6 +67,7 @@ class InvoiceCreateRequest(BaseModel):
 
 class InvoiceUpdateRequest(BaseModel):
     patient_name: str | None = Field(default=None, min_length=2, max_length=100)
+    patient_phone: str | None = Field(default=None, max_length=30)
     date: str | None = Field(default=None, min_length=4, max_length=30)
     items: list[InvoiceItem] | None = None
     insurance_status: str | None = Field(default=None, max_length=20)

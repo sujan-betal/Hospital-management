@@ -19,6 +19,7 @@ from src.modules.hospital.hospital_service import (
     delete_admission_service,
     delete_bed_service,
     delete_task_service,
+    get_revenue_service,
     get_settings_service,
     list_admissions_service,
     list_beds_service,
@@ -144,3 +145,11 @@ async def update_settings(
     db: AsyncSession = Depends(get_db),
 ):
     return await update_settings_service(payload, db)
+
+
+@router.get("/revenue")
+async def get_revenue(
+    admin=Depends(authorization(allowed_roles=["ADMIN", "SUBADMIN"])),
+    db: AsyncSession = Depends(get_db),
+):
+    return await get_revenue_service(db)

@@ -12,6 +12,7 @@ import {
   Stethoscope,
   KeyRound,
   AlertTriangle,
+  Wallet,
   X
 } from "lucide-react"
 
@@ -30,6 +31,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
     { id: "doctors", label: "Attending Doctors", icon: Stethoscope },
     { id: "tasks", label: "Nursing & Medical Tasks", icon: Activity },
     { id: "credentials", label: "Staff Credentials", icon: KeyRound },
+    { id: "payments", label: "Revenue & Payments", icon: Wallet },
     { id: "settings", label: "Hospital Configs", icon: Settings },
   ]
 

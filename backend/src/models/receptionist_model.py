@@ -26,6 +26,14 @@ class Receptionist(Base):
         String,
         default="RECEPTIONIST"
     )
+    token = Column(
+        Text, nullable=True)
+    is_reset = Column(
+        Boolean,
+        default=False,
+        server_default="false",
+        nullable=False
+    )
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now()

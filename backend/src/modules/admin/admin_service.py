@@ -9,6 +9,11 @@ from src.utils.common_schema import api_response_success, api_response_error
 from src.utils.status_code import StatusCode
 from src.modules.admin.admin_schema import AdminRegisterRequest, AdminLoginRequest
 from src.modules.admin.admin_helper import format_admin_data
+from src.modules.admin.permissions_catalog import (
+    PERMISSION_CATALOG,
+    normalize_permissions,
+)
+from src.modules.doctor.doctor_service import format_doctor_bank_data
 
 VALID_STATUSES = {"ACTIVE", "SUSPENDED", "INACTIVE"}
 
@@ -33,7 +38,15 @@ def _doctor_to_dict(doctor) -> dict:
     }
 
 
-def _staff_to_dict(account):
+async def _load_admin_permissions(db: AsyncSession, admin_id: int) -> list[str]:
+    """Load the permission keys stored for an admin/subadmin account."""
+    result = await db.execute(
+        select(Permission.permission).where(Permission.admin_id == admin_id)
+    )
+    return sorted({(p or "").upper() for p in result.scalars().all() if p})
+
+
+def _staff_to_dict(account, permissions: list[str] | None = None):
     data = {
         "user_id": str(account.user_id),
         "user_name": account.user_name,
@@ -48,6 +61,15 @@ def _staff_to_dict(account):
     else:
         data["phone"] = None
         data["department"] = None
+
+    # Admin / sub-admin accounts are permission-managed.
+    if isinstance(account, Admin):
+        data["admin_id"] = account.id
+        data["permissions"] = permissions or []
+    else:
+        data["admin_id"] = None
+        data["permissions"] = []
+
     return data
 
 
@@ -94,7 +116,10 @@ async def list_staff_service(db: AsyncSession):
 
         records = []
         for account in [*admins, *doctors, *receptionists]:
-            records.append(_staff_to_dict(account))
+            permissions = None
+            if isinstance(account, Admin):
+                permissions = await _load_admin_permissions(db, account.id)
+            records.append(_staff_to_dict(account, permissions))
 
         return api_response_success(
             data=records,
@@ -112,7 +137,9 @@ async def list_staff_service(db: AsyncSession):
 async def list_doctors_service(db: AsyncSession):
     try:
         doctors = (await db.execute(select(Doctor))).scalars().all()
-        records = [_doctor_to_dict(doctor) for doctor in doctors]
+        from src.modules.doctor.doctor_service import format_doctor_data
+
+        records = [format_doctor_data(doctor) for doctor in doctors]
 
         return api_response_success(
             data=records,
@@ -378,6 +405,11 @@ async def login_staff_service(
                     message=f"Account status is {receptionist.status}",
                     status_code=StatusCode.forbidden
                 )
+            if receptionist.is_reset:
+                return api_response_error(
+                    message="Please set your password using the link sent to your email.",
+                    status_code=StatusCode.forbidden
+                )
             if not verify_password(payload.password, receptionist.password):
                 return api_response_error(
                     message="Invalid email or password",
@@ -453,14 +485,15 @@ async def create_subadmin_service(
         db.add(new_subadmin)
         await db.flush()  # assign id
 
-        for perm in payload.permissions:
-            db.add(Permission(admin_id=new_subadmin.id, permission=perm.upper()))
+        permissions = normalize_permissions(payload.permissions)
+        for perm in permissions:
+            db.add(Permission(admin_id=new_subadmin.id, permission=perm))
 
         await db.commit()
         await db.refresh(new_subadmin)
 
         admin_data = format_admin_data(new_subadmin)
-        admin_data["permissions"] = [p.upper() for p in payload.permissions]
+        admin_data["permissions"] = permissions
 
         return api_response_success(
             data=admin_data,
@@ -493,13 +526,14 @@ async def assign_permissions_service(
             )
 
         await db.execute(delete(Permission).where(Permission.admin_id == payload.admin_id))
-        for perm in payload.permissions:
-            db.add(Permission(admin_id=payload.admin_id, permission=perm.upper()))
+        permissions = normalize_permissions(payload.permissions)
+        for perm in permissions:
+            db.add(Permission(admin_id=payload.admin_id, permission=perm))
 
         await db.commit()
 
         return api_response_success(
-            data={"admin_id": payload.admin_id, "permissions": [p.upper() for p in payload.permissions]},
+            data={"admin_id": payload.admin_id, "permissions": permissions},
             message="Permissions updated successfully",
             status_code=StatusCode.success
         )
@@ -509,4 +543,52 @@ async def assign_permissions_service(
         return api_response_error(
             message=f"Failed to update permissions: {str(e)}",
             status_code=StatusCode.internalServerError
+        )
+
+
+async def list_permissions_service(db: AsyncSession):
+    """Return the catalog of assignable permissions, grouped for the UI."""
+    try:
+        return api_response_success(
+            data=PERMISSION_CATALOG,
+            message="Permission catalog fetched successfully",
+            status_code=StatusCode.success,
+        )
+    except Exception as e:
+        return api_response_error(
+            message=f"Failed to fetch permission catalog: {str(e)}",
+            status_code=StatusCode.internalServerError,
+        )
+
+
+async def update_doctor_bank_details_service(user_id: str, payload, db: AsyncSession):
+    """Admin: update a doctor's payout bank details by user_id."""
+    try:
+        result = await db.execute(select(Doctor).where(Doctor.user_id == user_id))
+        doctor = result.scalar_one_or_none()
+
+        if not doctor:
+            return api_response_error(
+                message="Doctor not found",
+                status_code=StatusCode.notFound,
+            )
+
+        doctor.bank_account_holder = payload.account_holder
+        doctor.bank_account_number = payload.account_number
+        doctor.bank_ifsc = payload.ifsc
+        doctor.bank_name = payload.bank_name
+        doctor.upi_id = payload.upi_id
+        await db.commit()
+        await db.refresh(doctor)
+
+        return api_response_success(
+            data=format_doctor_bank_data(doctor),
+            message="Doctor bank details updated successfully",
+            status_code=StatusCode.success,
+        )
+    except Exception as e:
+        await db.rollback()
+        return api_response_error(
+            message=f"Failed to update doctor bank details: {str(e)}",
+            status_code=StatusCode.internalServerError,
         )

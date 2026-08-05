@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.admin_model import Admin
 from src.models.doctor_model import Doctor
+from src.models.receptionist_model import Receptionist
 from src.utils.common_schema import api_response_error, api_response_success
 from src.utils.email import send_password_reset_email
 from src.utils.security import (
@@ -31,6 +32,17 @@ def format_doctor_data(doctor: Doctor) -> dict:
         "status": doctor.status,
         "phone": doctor.phone,
         "department": doctor.department,
+        "rating": round(float(doctor.rating), 1) if doctor.rating is not None else 4.0,
+        "review_count": doctor.review_count or 0,
+        "experience_years": doctor.experience_years or 0,
+        "is_top_rated": (doctor.rating or 4.0) >= 4.5,
+        "has_bank_details": bool(doctor.bank_ifsc and doctor.bank_account_number),
+        "bank_account_holder": doctor.bank_account_holder or "",
+        "bank_account_number": _mask_account_number(doctor.bank_account_number),
+        "bank_ifsc": doctor.bank_ifsc or "",
+        "bank_name": doctor.bank_name or "",
+        "upi_id": doctor.upi_id or "",
+        "razorpayx_fund_account_id": doctor.razorpayx_fund_account_id or "",
     }
 
 
@@ -233,6 +245,25 @@ async def forgot_password_service(payload, db: AsyncSession):
                 reset_minutes=RESET_TOKEN_EXPIRE_MINUTES,
             )
 
+        receptionist_query = select(Receptionist).where(
+            or_(Receptionist.email == email, Receptionist.user_name == email)
+        )
+        receptionist_result = await db.execute(receptionist_query)
+        receptionist = receptionist_result.scalar_one_or_none()
+
+        if receptionist:
+            reset_token = _create_reset_token(receptionist.user_id, receptionist.role)
+            receptionist.token = reset_token
+            receptionist.is_reset = True
+            await db.commit()
+
+            send_password_reset_email(
+                to_email=receptionist.email,
+                full_name=receptionist.user_name,
+                reset_link=_build_reset_link(reset_token),
+                reset_minutes=RESET_TOKEN_EXPIRE_MINUTES,
+            )
+
         # Always return the same generic response to avoid leaking accounts.
         return api_response_success(
             data=None,
@@ -249,7 +280,7 @@ async def forgot_password_service(payload, db: AsyncSession):
 
 
 async def reset_password_service(payload, db: AsyncSession):
-    """Set a new password using a valid reset token (doctors and admins)."""
+    """Set a new password using a valid reset token (doctors, admins, receptionists)."""
     try:
         try:
             decoded = jwt.decode(
@@ -278,6 +309,11 @@ async def reset_password_service(payload, db: AsyncSession):
         if role == "DOCTOR":
             result = await db.execute(
                 select(Doctor).where(Doctor.user_id == user_uuid)
+            )
+            account = result.scalar_one_or_none()
+        elif role == "RECEPTIONIST":
+            result = await db.execute(
+                select(Receptionist).where(Receptionist.user_id == user_uuid)
             )
             account = result.scalar_one_or_none()
         elif role in ("ADMIN", "SUBADMIN"):
@@ -314,5 +350,116 @@ async def reset_password_service(payload, db: AsyncSession):
         await db.rollback()
         return api_response_error(
             message=f"Failed to reset password: {str(e)}",
+            status_code=StatusCode.internalServerError,
+        )
+
+
+# ─────────────────────── Bank details & payouts ───────────────────────
+
+def _mask_account_number(account_number: str | None) -> str:
+    if not account_number:
+        return ""
+    if len(account_number) <= 4:
+        return account_number
+    return "XXXX" + account_number[-4:]
+
+
+def format_doctor_bank_data(doctor: Doctor) -> dict:
+    return {
+        "account_holder": doctor.bank_account_holder or "",
+        "account_number": doctor.bank_account_number or "",
+        "ifsc": doctor.bank_ifsc or "",
+        "bank_name": doctor.bank_name or "",
+        "upi_id": doctor.upi_id or "",
+        "has_bank_details": bool(doctor.bank_ifsc and doctor.bank_account_number),
+        "razorpayx_contact_id": doctor.razorpayx_contact_id or "",
+        "razorpayx_fund_account_id": doctor.razorpayx_fund_account_id or "",
+    }
+
+
+async def get_bank_details_service(current_doctor, db: AsyncSession):
+    try:
+        return api_response_success(
+            data=format_doctor_bank_data(current_doctor),
+            message="Bank details fetched successfully",
+            status_code=StatusCode.success,
+        )
+    except Exception as e:
+        return api_response_error(
+            message=f"Failed to fetch bank details: {str(e)}",
+            status_code=StatusCode.internalServerError,
+        )
+
+
+async def update_bank_details_service(current_doctor, payload, db: AsyncSession):
+    try:
+        current_doctor.bank_account_holder = payload.account_holder
+        current_doctor.bank_account_number = payload.account_number
+        current_doctor.bank_ifsc = payload.ifsc
+        current_doctor.bank_name = payload.bank_name
+        current_doctor.upi_id = payload.upi_id
+        await db.commit()
+        await db.refresh(current_doctor)
+
+        return api_response_success(
+            data=format_doctor_bank_data(current_doctor),
+            message="Bank details saved. Payouts will be sent to this account.",
+            status_code=StatusCode.success,
+        )
+    except Exception as e:
+        await db.rollback()
+        return api_response_error(
+            message=f"Failed to save bank details: {str(e)}",
+            status_code=StatusCode.internalServerError,
+        )
+
+
+async def get_doctor_earnings_service(current_doctor, db: AsyncSession):
+    """Summarise the doctor's own consultation earnings and payout status."""
+    try:
+        from src.models.opd_appointment_model import OpdAppointment
+        from src.modules.patient.patient_query import appointment_to_dict
+
+        result = await db.execute(
+            select(OpdAppointment)
+            .where(
+                OpdAppointment.payment_status == "PAID",
+                OpdAppointment.doctor_name == current_doctor.user_name,
+            )
+            .order_by(OpdAppointment.updated_at.desc())
+        )
+        paid = result.scalars().all()
+
+        total_earned = 0
+        paid_out = 0
+        pending = 0
+        for appt in paid:
+            doctor_share = appt.doctor_share if appt.doctor_share is not None else 0
+            total_earned += doctor_share
+            if appt.payout_status == "PAID":
+                paid_out += doctor_share
+            else:
+                pending += doctor_share
+
+        return api_response_success(
+            data={
+                "bank": format_doctor_bank_data(current_doctor),
+                "summary": {
+                    "total_earned": total_earned,
+                    "paid_out": paid_out,
+                    "pending": pending,
+                    "payments_count": len(paid),
+                    "doctor_share_percent": paid[0].doctor_share_percent
+                    if paid and paid[0].doctor_share_percent is not None
+                    else 0,
+                },
+                "payments": [appointment_to_dict(a) for a in paid],
+            },
+            message="Earnings fetched successfully",
+            status_code=StatusCode.success,
+        )
+    except Exception as e:
+        return api_response_error(
+            message=f"Failed to fetch earnings: {str(e)}",
             status_code=StatusCode.internalServerError,
         )

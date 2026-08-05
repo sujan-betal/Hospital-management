@@ -10,6 +10,7 @@ class Invoice(Base):
     id = Column(Integer, primary_key=True, index=True)
     invoice_id = Column(String, unique=True, nullable=False)
     patient_name = Column(String, nullable=False)
+    patient_phone = Column(String, nullable=True)
     date = Column(String, nullable=False)
     amount = Column(Integer, nullable=False, default=0)
     items = Column(Text, nullable=True)
