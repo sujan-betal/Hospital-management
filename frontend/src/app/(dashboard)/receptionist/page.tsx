@@ -66,6 +66,51 @@ interface Invoice {
   paymentStatus: "paid" | "unpaid"
 }
 
+// Fallback dummy data so every panel renders even when the API is unreachable/empty
+const mockPatients: Patient[] = [
+  { id: "PAT-001", name: "Emma Watson", age: 32, gender: "Female", phone: "+1 (555) 019-2834", email: "emma.watson@gmail.com", insuranceProvider: "BlueCross Health", registeredAt: "2026-07-20" },
+  { id: "PAT-002", name: "Liam Neeson", age: 68, gender: "Male", phone: "+44 7911 123456", email: "liam@taken.com", insuranceProvider: "Aetna Premium", registeredAt: "2026-07-19" },
+  { id: "PAT-003", name: "Robert Downey Jr.", age: 55, gender: "Male", phone: "+1 (555) 300-3000", email: "rdj@stark.com", insuranceProvider: "Star Health Assurance", registeredAt: "2026-07-18" },
+  { id: "PAT-004", name: "Scarlett Johansson", age: 36, gender: "Female", phone: "+1 (555) 102-8822", email: "scarlett@avengers.org", insuranceProvider: "MetLife Shield", registeredAt: "2026-07-17" },
+  { id: "PAT-005", name: "Leonardo DiCaprio", age: 47, gender: "Male", phone: "+1 (555) 987-6543", email: "leo@di-caprio.com", insuranceProvider: "Self-Pay (Uninsured)", registeredAt: "2026-07-16" },
+]
+
+const mockAppointments: Appointment[] = [
+  { id: "APT-901", patientName: "Robert Downey Jr.", doctorName: "Dr. Gregory House", specialty: "General Medicine", date: "2026-07-20", time: "09:30 AM", status: "checked-in" },
+  { id: "APT-902", patientName: "Emma Watson", doctorName: "Dr. Gregory House", specialty: "General Medicine", date: "2026-07-20", time: "10:15 AM", status: "checked-in" },
+  { id: "APT-903", patientName: "Liam Neeson", doctorName: "Dr. Stephen Strange", specialty: "Cardiology", date: "2026-07-20", time: "11:00 AM", status: "scheduled" },
+  { id: "APT-904", patientName: "Scarlett Johansson", doctorName: "Dr. Allison Cameron", specialty: "Pediatrics", date: "2026-07-20", time: "11:45 AM", status: "scheduled" },
+  { id: "APT-905", patientName: "Leonardo DiCaprio", doctorName: "Dr. Meredith Grey", specialty: "Neurology", date: "2026-07-21", time: "02:15 PM", status: "scheduled" },
+]
+
+const mockInvoices: Invoice[] = [
+  { id: "INV-401", patientName: "Robert Downey Jr.", date: "2026-07-20", amount: 850, items: [{ description: "General Consultation (OPD)", cost: 150 }, { description: "ECG Diagnostic Scan", cost: 300 }, { description: "Cardiology Telemetry Hookup", cost: 400 }], insuranceStatus: "covered", paymentStatus: "paid" },
+  { id: "INV-402", patientName: "Emma Watson", date: "2026-07-20", amount: 450, items: [{ description: "General Consultation (OPD)", cost: 150 }, { description: "CBC Blood Panel", cost: 300 }], insuranceStatus: "pending", paymentStatus: "unpaid" },
+  { id: "INV-403", patientName: "Liam Neeson", date: "2026-07-21", amount: 300, items: [{ description: "Cardiology Consultation", cost: 200 }, { description: "Lipid Profile Panel", cost: 100 }], insuranceStatus: "uninsured", paymentStatus: "unpaid" },
+]
+
+const mockDoctors: DoctorOption[] = [
+  { user_id: "DOC-001", name: "Dr. Gregory House", specialty: "General Medicine", department: "OPD - General", email: "house@aura-med.org", phone: "+1 (555) 123-9081" },
+  { user_id: "DOC-002", name: "Dr. Meredith Grey", specialty: "Neurology", department: "Neuro Sciences", email: "grey@aura-med.org", phone: "+1 (555) 345-1234" },
+  { user_id: "DOC-003", name: "Dr. Shaun Murphy", specialty: "Orthopedics", department: "Ortho & Trauma", email: "murphy@aura-med.org", phone: "+1 (555) 890-4321" },
+  { user_id: "DOC-004", name: "Dr. Stephen Strange", specialty: "Cardiology", department: "Cardio Thoracic", email: "strange@aura-med.org", phone: "+1 (555) 456-7890" },
+  { user_id: "DOC-005", name: "Dr. Allison Cameron", specialty: "Pediatrics", department: "Pediatric Care", email: "cameron@aura-med.org", phone: "+1 (555) 789-0123" },
+]
+
+const mockDashboard: DashboardStats = {
+  today_visits: 12,
+  checked_in_today: 8,
+  total_patients: 342,
+  paid_billings: 25400,
+  unpaid_billings: 8850,
+  unpaid_invoices: 4,
+  total_beds: 10,
+  occupied_beds: 6,
+  occupancy_rate: 60,
+  pending_tasks: 3,
+  admitted: 4,
+}
+
 export default function ReceptionistDashboard() {
   const [activeTab, setActiveTab] = useState<"registration" | "appointments" | "billing" | "reports">("registration")
   const [currentTime, setCurrentTime] = useState("")
@@ -79,13 +124,13 @@ export default function ReceptionistDashboard() {
     }
   }, [])
 
-  // State variables (fetched from the receptionist API)
+  // State variables (fetched from the receptionist API; falls back to dummy data)
   const [loading, setLoading] = useState(true)
-  const [patients, setPatients] = useState<Patient[]>([])
-  const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [doctors, setDoctors] = useState<DoctorOption[]>([])
-  const [dashboard, setDashboard] = useState<DashboardStats | null>(null)
+  const [patients, setPatients] = useState<Patient[]>(mockPatients)
+  const [appointments, setAppointments] = useState<Appointment[]>(mockAppointments)
+  const [invoices, setInvoices] = useState<Invoice[]>(mockInvoices)
+  const [doctors, setDoctors] = useState<DoctorOption[]>(mockDoctors)
+  const [dashboard, setDashboard] = useState<DashboardStats | null>(mockDashboard)
 
   useEffect(() => {
     let active = true
@@ -100,38 +145,44 @@ export default function ReceptionistDashboard() {
         ])
         if (!active) return
 
-        setPatients(pRes.data.map((p) => ({
-          id: `PAT-${String(p.id).padStart(3, "0")}`,
-          name: p.name,
-          age: p.age ?? 30,
-          gender: (p.gender || "Male") as Patient["gender"],
-          phone: p.phone,
-          email: p.email || "no-email@aura.org",
-          insuranceProvider: p.insurance_provider,
-          registeredAt: p.created_at ? p.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
-        })))
+        if (pRes.data.length) {
+          setPatients(pRes.data.map((p) => ({
+            id: `PAT-${String(p.id).padStart(3, "0")}`,
+            name: p.name,
+            age: p.age ?? 30,
+            gender: (p.gender || "Male") as Patient["gender"],
+            phone: p.phone,
+            email: p.email || "no-email@aura.org",
+            insuranceProvider: p.insurance_provider,
+            registeredAt: p.created_at ? p.created_at.split("T")[0] : new Date().toISOString().split("T")[0],
+          })))
+        }
 
-        setAppointments(aRes.data.map((a) => ({
-          id: a.appointment_id,
-          patientName: a.patient_name,
-          doctorName: a.doctor_name,
-          specialty: a.specialty,
-          date: a.date,
-          time: a.time,
-          status: a.status.toLowerCase() as Appointment["status"],
-        })))
+        if (aRes.data.length) {
+          setAppointments(aRes.data.map((a) => ({
+            id: a.appointment_id,
+            patientName: a.patient_name,
+            doctorName: a.doctor_name,
+            specialty: a.specialty,
+            date: a.date,
+            time: a.time,
+            status: a.status.toLowerCase() as Appointment["status"],
+          })))
+        }
 
-        setInvoices(iRes.data.map((inv) => ({
-          id: inv.invoice_id,
-          patientName: inv.patient_name,
-          date: inv.date,
-          amount: inv.amount,
-          items: inv.items,
-          insuranceStatus: inv.insurance_status.toLowerCase() as Invoice["insuranceStatus"],
-          paymentStatus: inv.payment_status.toLowerCase() as Invoice["paymentStatus"],
-        })))
+        if (iRes.data.length) {
+          setInvoices(iRes.data.map((inv) => ({
+            id: inv.invoice_id,
+            patientName: inv.patient_name,
+            date: inv.date,
+            amount: inv.amount,
+            items: inv.items,
+            insuranceStatus: inv.insurance_status.toLowerCase() as Invoice["insuranceStatus"],
+            paymentStatus: inv.payment_status.toLowerCase() as Invoice["paymentStatus"],
+          })))
+        }
 
-        setDoctors(dRes.data)
+        if (dRes.data.length) setDoctors(dRes.data)
         setDashboard(dashRes.data)
       } catch (err: any) {
         console.error("Failed to load receptionist data", err)

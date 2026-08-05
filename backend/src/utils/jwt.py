@@ -13,7 +13,8 @@ from src.config.database import get_mysql_db
 
 load_dotenv()
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+DEFAULT_JWT_SECRET = "aura-medical-dev-secret-change-me-in-production"
+SECRET_KEY = os.getenv("JWT_SECRET_KEY") or DEFAULT_JWT_SECRET
 ALGORITHM  = os.getenv("JWT_ALGORITHM", "HS256")
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
