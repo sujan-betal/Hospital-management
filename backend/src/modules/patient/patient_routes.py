@@ -7,25 +7,34 @@ from src.config.database import get_db
 from src.middleware.auth import authorization
 from src.modules.patient.patient_schema import (
     PatientAppointmentCreateRequest,
+    PatientAppointmentUpdateRequest,
     PatientCreateRequest,
     PatientOtpSendRequest,
     PatientOtpVerifyRequest,
+    PatientPaymentVerifyRequest,
+    PatientReviewCreateRequest,
     PatientUpdateRequest,
 )
 from src.modules.patient.patient_service import (
     book_appointment_service,
     create_patient_service,
+    create_payment_order_service,
     delete_patient_service,
     get_patient_profile_service,
     get_patient_service,
+    list_booked_slots_service,
     list_patient_appointments_service,
     list_patient_doctors_service,
     list_patient_invoices_service,
+    list_patient_reviews_service,
     list_patients_service,
     send_otp_service,
+    submit_doctor_review_service,
+    update_patient_appointment_service,
     update_patient_profile_service,
     update_patient_service,
     verify_otp_service,
+    verify_payment_service,
 )
 
 router = APIRouter(prefix="/api/patient", tags=["Patient"])
@@ -92,6 +101,15 @@ async def list_appointments(
     return await list_patient_appointments_service(patient, db)
 
 
+@router.get("/appointments/booked-slots")
+async def booked_slots(
+    date: str,
+    patient=Depends(authorization(allowed_roles=PATIENT_ROLES)),
+    db: AsyncSession = Depends(get_db),
+):
+    return await list_booked_slots_service(date, db)
+
+
 @router.post("/appointments")
 async def book_appointment(
     payload: PatientAppointmentCreateRequest,
@@ -101,12 +119,58 @@ async def book_appointment(
     return await book_appointment_service(patient, payload, db)
 
 
+@router.put("/appointments/{appointment_id}")
+async def update_appointment(
+    appointment_id: str,
+    payload: PatientAppointmentUpdateRequest,
+    patient=Depends(authorization(allowed_roles=PATIENT_ROLES)),
+    db: AsyncSession = Depends(get_db),
+):
+    return await update_patient_appointment_service(patient, appointment_id, payload, db)
+
+
+@router.post("/appointments/{appointment_id}/payment/order")
+async def create_payment_order(
+    appointment_id: str,
+    patient=Depends(authorization(allowed_roles=PATIENT_ROLES)),
+    db: AsyncSession = Depends(get_db),
+):
+    return await create_payment_order_service(patient, appointment_id, db)
+
+
+@router.post("/appointments/{appointment_id}/payment/verify")
+async def verify_payment(
+    appointment_id: str,
+    payload: PatientPaymentVerifyRequest,
+    patient=Depends(authorization(allowed_roles=PATIENT_ROLES)),
+    db: AsyncSession = Depends(get_db),
+):
+    return await verify_payment_service(patient, appointment_id, payload, db)
+
+
 @router.get("/invoices")
 async def list_invoices(
     patient=Depends(authorization(allowed_roles=PATIENT_ROLES)),
     db: AsyncSession = Depends(get_db),
 ):
     return await list_patient_invoices_service(patient, db)
+
+
+@router.get("/reviews")
+async def list_reviews(
+    patient=Depends(authorization(allowed_roles=PATIENT_ROLES)),
+    db: AsyncSession = Depends(get_db),
+):
+    return await list_patient_reviews_service(patient, db)
+
+
+@router.post("/reviews")
+async def submit_review(
+    payload: PatientReviewCreateRequest,
+    patient=Depends(authorization(allowed_roles=PATIENT_ROLES)),
+    db: AsyncSession = Depends(get_db),
+):
+    return await submit_doctor_review_service(patient, payload, db)
 
 
 @router.get("")

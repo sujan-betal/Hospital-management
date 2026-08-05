@@ -43,6 +43,8 @@ def appointment_to_dict(appt: OpdAppointment) -> dict:
         "date": appt.date,
         "time": appt.time,
         "status": appt.status,
+        "fee": appt.fee or 150,
+        "payment_status": appt.payment_status or "UNPAID",
         "created_at": appt.created_at,
         "updated_at": appt.updated_at,
     }

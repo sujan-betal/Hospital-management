@@ -25,9 +25,26 @@ export interface CreateSubAdminPayload {
   permissions: string[]
 }
 
+export interface CreateReceptionistPayload {
+  user_name: string
+  email: string
+  password: string
+}
+
 export interface AssignPermissionsPayload {
   admin_id: number
   permissions: string[]
+}
+
+export interface PermissionOption {
+  key: string
+  label: string
+  description: string
+}
+
+export interface PermissionGroup {
+  group: string
+  items: PermissionOption[]
 }
 
 export interface StaffMember {
@@ -39,6 +56,8 @@ export interface StaffMember {
   phone: string | null
   department: string | null
   created_at: string | null
+  admin_id?: number | null
+  permissions?: string[]
 }
 
 export interface UpdateStaffPayload {
@@ -83,11 +102,19 @@ export async function createSubAdmin(payload: CreateSubAdminPayload) {
   return api.post<ApiResponse<AdminData>>("/api/admin/subadmins", payload)
 }
 
+export async function createReceptionist(payload: CreateReceptionistPayload) {
+  return api.post<ApiResponse<AdminData>>("/api/receptionist/register", payload)
+}
+
 export async function assignPermissions(payload: AssignPermissionsPayload) {
   return api.put<ApiResponse<{ admin_id: number; permissions: string[] }>>(
     "/api/admin/permissions",
     payload
   )
+}
+
+export async function listPermissions() {
+  return api.get<ApiResponse<PermissionGroup[]>>("/api/admin/permissions")
 }
 
 export async function forgotPassword(email: string) {

@@ -49,11 +49,16 @@ export interface PatientAppointment {
   appointment_id: string
   patient_name: string
   patient_phone: string
+  patient_user_id?: string
   doctor_name: string
   specialty: string
   date: string
   time: string
   status: string
+  fee?: number
+  payment_status?: string
+  payment_id?: string
+  razorpay_order_id?: string
   created_at?: string | null
   updated_at?: string | null
 }
@@ -84,6 +89,33 @@ export interface PatientBookingPayload {
   time: string
 }
 
+export interface PatientAppointmentUpdatePayload {
+  doctor_name?: string
+  specialty?: string
+  date?: string
+  time?: string
+}
+
+export interface PatientPaymentOrder {
+  key_id: string
+  order_id: string
+  amount: number
+  currency: string
+  receipt: string
+  appointment_id: string
+}
+
+export interface PatientPaymentVerifyPayload {
+  razorpay_order_id: string
+  razorpay_payment_id: string
+  razorpay_signature: string
+}
+
+export interface PatientPaymentVerifyResponse {
+  appointment: PatientAppointment
+  invoice: PatientInvoice | null
+}
+
 export interface Doctor {
   user_id: string
   name: string
@@ -91,6 +123,31 @@ export interface Doctor {
   department: string | null
   email: string
   phone: string | null
+  rating?: number
+  review_count?: number
+  experience_years?: number
+  is_top_rated?: boolean
+}
+
+export interface DoctorReview {
+  id: number
+  review_id: string
+  appointment_id: string
+  doctor_id: string
+  doctor_name: string
+  specialty: string
+  patient_user_id: string
+  patient_name: string
+  rating: number
+  comment: string
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface ReviewCreatePayload {
+  appointment_id: string
+  rating: number
+  comment?: string
 }
 
 export interface ApiResponse<T> {
@@ -130,12 +187,60 @@ export async function getPatientAppointments() {
   return api.get<ApiResponse<PatientAppointment[]>>("/api/patient/appointments")
 }
 
+export interface BookedSlot {
+  doctor_name: string
+  time: string
+}
+
+export async function getBookedSlots(date: string) {
+  return api.get<ApiResponse<BookedSlot[]>>(
+    `/api/patient/appointments/booked-slots?date=${encodeURIComponent(date)}`
+  )
+}
+
 export async function bookPatientAppointment(payload: PatientBookingPayload) {
   return api.post<ApiResponse<PatientAppointment>>("/api/patient/appointments", payload)
 }
 
+export async function updatePatientAppointment(
+  appointmentId: string,
+  payload: PatientAppointmentUpdatePayload
+) {
+  return api.put<ApiResponse<PatientAppointment>>(
+    `/api/patient/appointments/${appointmentId}`,
+    payload
+  )
+}
+
+export async function createPatientPaymentOrder(appointmentId: string) {
+  return api.post<ApiResponse<PatientPaymentOrder>>(
+    `/api/patient/appointments/${appointmentId}/payment/order`,
+    {}
+  )
+}
+
+export async function verifyPatientPayment(
+  appointmentId: string,
+  payload: PatientPaymentVerifyPayload
+) {
+  return api.post<ApiResponse<PatientPaymentVerifyResponse>>(
+    `/api/patient/appointments/${appointmentId}/payment/verify`,
+    payload
+  )
+}
+
 export async function getPatientInvoices() {
   return api.get<ApiResponse<PatientInvoice[]>>("/api/patient/invoices")
+}
+
+// ─── Doctor reviews ────────────────────────────────────────────
+
+export async function getPatientReviews() {
+  return api.get<ApiResponse<DoctorReview[]>>("/api/patient/reviews")
+}
+
+export async function submitDoctorReview(payload: ReviewCreatePayload) {
+  return api.post<ApiResponse<DoctorReview>>("/api/patient/reviews", payload)
 }
 
 // ─── Staff/admin patient management ─────────────────────────────

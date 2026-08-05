@@ -4,31 +4,48 @@ All patient-related operations live here — staff creation, OTP login and
 profile management. Low-level DB helpers live in `patient_query.py`.
 """
 
+import json
 import os
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.models.doctor_review_model import DoctorReview
+from src.models.invoice_model import Invoice
 from src.models.opd_appointment_model import OpdAppointment
 from src.models.patient_model import Patient
 from src.modules.patient.patient_query import (
     appointment_to_dict,
     clear_patient_otp,
+    find_appointment_by_appointment_id,
+    find_booked_slots,
+    find_doctor_by_name,
     find_patient_appointments,
     find_patient_by_phone,
     find_patient_by_phone_normalized,
     find_patient_by_user_id,
     find_patient_invoices,
+    find_patient_reviews,
+    find_review_by_appointment,
+    find_slot_booking,
+    generate_review_id,
     invoice_to_dict,
     list_active_doctors,
+    patient_owns_appointment,
     patient_to_dict,
+    recompute_doctor_rating,
+    review_to_dict,
     set_patient_otp,
 )
 from src.modules.patient.patient_schema import (
     PatientAppointmentCreateRequest,
+    PatientAppointmentUpdateRequest,
     PatientCreateRequest,
     PatientOtpSendRequest,
     PatientOtpVerifyRequest,
+    PatientPaymentVerifyRequest,
+    PatientReviewCreateRequest,
     PatientUpdateRequest,
 )
 from src.utils.common_schema import api_response_error, api_response_success
@@ -319,6 +336,23 @@ async def list_patient_appointments_service(current_patient, db: AsyncSession):
         )
 
 
+async def list_booked_slots_service(date: str, db: AsyncSession):
+    """Return all active doctor/time slots already booked for a date so the
+    booking UI can grey them out."""
+    try:
+        slots = await find_booked_slots(db, date)
+        return api_response_success(
+            data=slots,
+            message="Booked slots fetched successfully",
+            status_code=StatusCode.success,
+        )
+    except Exception as e:
+        return api_response_error(
+            message=f"Failed to fetch booked slots: {str(e)}",
+            status_code=StatusCode.internalServerError,
+        )
+
+
 async def list_patient_invoices_service(current_patient, db: AsyncSession):
     """Return the logged-in patient's invoices/bills."""
     try:
@@ -342,12 +376,109 @@ async def list_patient_invoices_service(current_patient, db: AsyncSession):
         )
 
 
+# ─────────────────────── Doctor reviews ───────────────────────
+
+async def list_patient_reviews_service(current_patient, db: AsyncSession):
+    """Return every review the logged-in patient has left."""
+    try:
+        patient = await find_patient_by_user_id(db, current_patient.user_id)
+        if not patient:
+            return api_response_error(
+                message="Patient not found",
+                status_code=StatusCode.notFound,
+            )
+        reviews = await find_patient_reviews(db, patient)
+        return api_response_success(
+            data=reviews,
+            message="Reviews fetched successfully",
+            status_code=StatusCode.success,
+        )
+    except Exception as e:
+        return api_response_error(
+            message=f"Failed to fetch reviews: {str(e)}",
+            status_code=StatusCode.internalServerError,
+        )
+
+
+async def submit_doctor_review_service(
+    current_patient,
+    payload: PatientReviewCreateRequest,
+    db: AsyncSession,
+):
+    """Let a patient rate + comment on a doctor after their visit. The
+    doctor is resolved from the appointment, and the visit must be marked
+    CHECKED-IN or COMPLETED before a review is accepted."""
+    try:
+        patient = await find_patient_by_user_id(db, current_patient.user_id)
+        if not patient:
+            return api_response_error(
+                message="Patient not found",
+                status_code=StatusCode.notFound,
+            )
+
+        appt = await find_appointment_by_appointment_id(db, payload.appointment_id)
+        if not appt or not patient_owns_appointment(appt, patient):
+            return api_response_error(
+                message="Appointment not found",
+                status_code=StatusCode.notFound,
+            )
+
+        if appt.status.upper() not in {"CHECKED-IN", "COMPLETED"}:
+            return api_response_error(
+                message=(
+                    "You can only review a doctor after your consultation "
+                    "has been completed."
+                ),
+                status_code=StatusCode.badRequest,
+            )
+
+        if await find_review_by_appointment(db, appt.appointment_id):
+            return api_response_error(
+                message="You have already reviewed this visit",
+                status_code=StatusCode.conflict,
+            )
+
+        doctor = await find_doctor_by_name(db, appt.doctor_name)
+        review = DoctorReview(
+            review_id=await generate_review_id(db),
+            appointment_id=appt.appointment_id,
+            doctor_id=str(doctor.user_id) if doctor else None,
+            doctor_name=appt.doctor_name,
+            specialty=appt.specialty,
+            patient_user_id=str(patient.user_id),
+            patient_name=patient.user_name,
+            rating=payload.rating,
+            comment=(payload.comment or "").strip() or None,
+        )
+        db.add(review)
+        if doctor:
+            await recompute_doctor_rating(db, doctor, payload.rating)
+        await db.commit()
+        await db.refresh(review)
+
+        return api_response_success(
+            data=review_to_dict(review),
+            message=(
+                f"Thank you for rating {appt.doctor_name}! "
+                f"Your feedback has been saved."
+            ),
+            status_code=StatusCode.create,
+        )
+    except Exception as e:
+        await db.rollback()
+        return api_response_error(
+            message=f"Failed to submit review: {str(e)}",
+            status_code=StatusCode.internalServerError,
+        )
+
+
 async def book_appointment_service(current_patient, payload: PatientAppointmentCreateRequest, db: AsyncSession):
     """Let a logged-in patient book an OPD slot. Identity comes from the
     authenticated account so the appointment links back to the patient."""
     try:
         from src.modules.receptionist.receptionist_query import (
             generate_appointment_id,
+            generate_invoice_id,
         )
 
         patient = await find_patient_by_user_id(db, current_patient.user_id)
@@ -363,18 +494,43 @@ async def book_appointment_service(current_patient, payload: PatientAppointmentC
                 status_code=StatusCode.badRequest,
             )
 
+        existing_slot = await find_slot_booking(
+            db, payload.doctor_name, payload.date, payload.time
+        )
+        if existing_slot:
+            return api_response_error(
+                message=(
+                    f"This time slot is already booked for {payload.doctor_name} "
+                    f"on {payload.date}. Please pick another time."
+                ),
+                status_code=StatusCode.conflict,
+            )
+
         appt = OpdAppointment(
             appointment_id=await generate_appointment_id(db),
             patient_name=patient.user_name,
             patient_phone=patient.phone,
+            patient_user_id=str(patient.user_id),
             doctor_name=payload.doctor_name,
             specialty=payload.specialty,
             date=payload.date,
             time=payload.time,
             status="SCHEDULED",
+            fee=150,
+            payment_status="UNPAID",
         )
         db.add(appt)
-        await db.commit()
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            return api_response_error(
+                message=(
+                    f"This time slot was just booked for {payload.doctor_name} "
+                    f"on {payload.date}. Please pick another time."
+                ),
+                status_code=StatusCode.conflict,
+            )
         await db.refresh(appt)
 
         return api_response_success(
@@ -386,6 +542,271 @@ async def book_appointment_service(current_patient, payload: PatientAppointmentC
         await db.rollback()
         return api_response_error(
             message=f"Failed to book appointment: {str(e)}",
+            status_code=StatusCode.internalServerError,
+        )
+
+
+async def update_patient_appointment_service(
+    current_patient, appointment_id: str, payload: PatientAppointmentUpdateRequest, db: AsyncSession
+):
+    """Let a patient reschedule their own appointment (new date/time)."""
+    try:
+        appt = await find_appointment_by_appointment_id(db, appointment_id)
+        if not appt:
+            return api_response_error(
+                message="Appointment not found",
+                status_code=StatusCode.notFound,
+            )
+
+        patient = await find_patient_by_user_id(db, current_patient.user_id)
+        if not patient or not patient_owns_appointment(appt, patient):
+            return api_response_error(
+                message="Appointment not found",
+                status_code=StatusCode.notFound,
+            )
+
+        if appt.status.upper() == "CANCELLED":
+            return api_response_error(
+                message="Cancelled appointments cannot be edited",
+                status_code=StatusCode.badRequest,
+            )
+
+        new_date = payload.date if payload.date is not None else appt.date
+        new_time = payload.time if payload.time is not None else appt.time
+        new_doctor = (
+            payload.doctor_name if payload.doctor_name is not None else appt.doctor_name
+        )
+
+        if (
+            payload.date is not None
+            or payload.time is not None
+            or payload.doctor_name is not None
+        ):
+            conflict = await find_slot_booking(
+                db,
+                new_doctor,
+                new_date,
+                new_time,
+                exclude_appointment_id=appt.appointment_id,
+            )
+            if conflict:
+                return api_response_error(
+                    message=(
+                        f"This time slot is already booked for {new_doctor} "
+                        f"on {new_date}. Please pick another time."
+                    ),
+                    status_code=StatusCode.conflict,
+                )
+
+        if payload.doctor_name is not None:
+            appt.doctor_name = payload.doctor_name
+        if payload.specialty is not None:
+            appt.specialty = payload.specialty
+        if payload.date is not None:
+            appt.date = payload.date
+        if payload.time is not None:
+            appt.time = payload.time
+
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            return api_response_error(
+                message=(
+                    f"This time slot was just booked for {new_doctor} "
+                    f"on {new_date}. Please pick another time."
+                ),
+                status_code=StatusCode.conflict,
+            )
+        await db.refresh(appt)
+
+        return api_response_success(
+            data=appointment_to_dict(appt),
+            message=f"Appointment {appt.appointment_id} rescheduled successfully",
+            status_code=StatusCode.success,
+        )
+    except Exception as e:
+        await db.rollback()
+        return api_response_error(
+            message=f"Failed to update appointment: {str(e)}",
+            status_code=StatusCode.internalServerError,
+        )
+
+
+# ─────────────────────── Razorpay payments ───────────────────────
+
+def _razorpay_client():
+    key_id = os.getenv("RAZORPAY_KEY_ID", "").strip().strip("'")
+    key_secret = os.getenv("RAZORPAY_KEY_SECRET", "").strip().strip("'")
+    if not key_id or not key_secret:
+        return None, None
+    try:
+        import razorpay
+    except ImportError:
+        return None, None
+    return razorpay.Client(auth=(key_id, key_secret)), key_id
+
+
+async def create_payment_order_service(
+    current_patient, appointment_id: str, db: AsyncSession
+):
+    """Create a Razorpay order for the appointment's OPD consultation fee."""
+    try:
+        appt = await find_appointment_by_appointment_id(db, appointment_id)
+        if not appt:
+            return api_response_error(
+                message="Appointment not found",
+                status_code=StatusCode.notFound,
+            )
+
+        patient = await find_patient_by_user_id(db, current_patient.user_id)
+        if not patient or not patient_owns_appointment(appt, patient):
+            return api_response_error(
+                message="Appointment not found",
+                status_code=StatusCode.notFound,
+            )
+
+        if appt.status.upper() == "CANCELLED":
+            return api_response_error(
+                message="Cancelled appointments cannot be paid for",
+                status_code=StatusCode.badRequest,
+            )
+        if appt.payment_status.upper() == "PAID":
+            return api_response_error(
+                message="This appointment is already paid",
+                status_code=StatusCode.conflict,
+            )
+
+        client, key_id = _razorpay_client()
+        if client is None or not key_id:
+            return api_response_error(
+                message="Razorpay is not configured. Please contact the front desk.",
+                status_code=StatusCode.internalServerError,
+            )
+
+        fee = appt.fee or 150
+        order = client.order.create({
+            "amount": fee * 100,
+            "currency": "INR",
+            "receipt": appt.appointment_id,
+            "payment_capture": 1,
+            "notes": {"appointment_id": appt.appointment_id},
+        })
+
+        appt.razorpay_order_id = order.get("id")
+        await db.commit()
+
+        return api_response_success(
+            data={
+                "key_id": key_id,
+                "order_id": order.get("id"),
+                "amount": order.get("amount", fee * 100),
+                "currency": order.get("currency", "INR"),
+                "receipt": appt.appointment_id,
+                "appointment_id": appt.appointment_id,
+            },
+            message="Payment order created successfully",
+            status_code=StatusCode.success,
+        )
+    except Exception as e:
+        await db.rollback()
+        return api_response_error(
+            message=f"Failed to create payment order: {str(e)}",
+            status_code=StatusCode.internalServerError,
+        )
+
+
+async def verify_payment_service(
+    current_patient,
+    appointment_id: str,
+    payload: PatientPaymentVerifyRequest,
+    db: AsyncSession,
+):
+    """Verify the Razorpay signature, mark the appointment PAID and raise a
+    matching invoice so it also shows under Bills & Invoices."""
+    try:
+        from src.modules.receptionist.receptionist_query import (
+            generate_invoice_id,
+        )
+
+        appt = await find_appointment_by_appointment_id(db, appointment_id)
+        if not appt:
+            return api_response_error(
+                message="Appointment not found",
+                status_code=StatusCode.notFound,
+            )
+
+        patient = await find_patient_by_user_id(db, current_patient.user_id)
+        if not patient or not patient_owns_appointment(appt, patient):
+            return api_response_error(
+                message="Appointment not found",
+                status_code=StatusCode.notFound,
+            )
+
+        client, _ = _razorpay_client()
+        if client is None:
+            return api_response_error(
+                message="Razorpay is not configured. Please contact the front desk.",
+                status_code=StatusCode.internalServerError,
+            )
+
+        try:
+            client.utility.verify_payment_signature({
+                "razorpay_order_id": payload.razorpay_order_id,
+                "razorpay_payment_id": payload.razorpay_payment_id,
+                "razorpay_signature": payload.razorpay_signature,
+            })
+        except Exception:
+            return api_response_error(
+                message="Payment verification failed. Please try again.",
+                status_code=StatusCode.badRequest,
+            )
+
+        if appt.payment_status.upper() == "PAID":
+            return api_response_success(
+                data={"appointment": appointment_to_dict(appt), "invoice": None},
+                message="Payment already confirmed for this appointment",
+                status_code=StatusCode.success,
+            )
+
+        appt.payment_status = "PAID"
+        appt.payment_id = payload.razorpay_payment_id
+        appt.payment_signature = payload.razorpay_signature
+
+        fee = appt.fee or 150
+        invoice = Invoice(
+            invoice_id=await generate_invoice_id(db),
+            patient_name=appt.patient_name,
+            patient_phone=appt.patient_phone,
+            date=appt.date,
+            amount=fee,
+            items=json.dumps([
+                {"description": f"OPD Consultation – {appt.doctor_name}", "cost": fee}
+            ]),
+            insurance_status="UNINSURED",
+            payment_status="PAID",
+        )
+        db.add(invoice)
+
+        try:
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            return api_response_error(
+                message="Could not confirm your payment. Please contact the front desk.",
+                status_code=StatusCode.internalServerError,
+            )
+        await db.refresh(appt)
+
+        return api_response_success(
+            data={"appointment": appointment_to_dict(appt), "invoice": invoice_to_dict(invoice)},
+            message="Payment successful. Your appointment is confirmed.",
+            status_code=StatusCode.success,
+        )
+    except Exception as e:
+        await db.rollback()
+        return api_response_error(
+            message=f"Failed to verify payment: {str(e)}",
             status_code=StatusCode.internalServerError,
         )
 

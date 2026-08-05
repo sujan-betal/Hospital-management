@@ -39,10 +39,10 @@ ROLE_MODEL_MAP = {
 READ_DB = "local"  # "local" or "supabase"
 
 # Roles that go through the Permission table check (admin_id FK on Permission)
-PERMISSION_ROLES = ("ADMIN", "SUBADMIN", "DOCTOR", "RECEPTIONIST")
+PERMISSION_ROLES = ("SUBADMIN", "DOCTOR", "RECEPTIONIST")
 
 # Roles that skip permission checks entirely (authenticated + role-allowed is enough)
-NO_PERMISSION_ROLES = ("PATIENT",)
+NO_PERMISSION_ROLES = ("PATIENT", "ADMIN")
 
 
 def authorization(allowed_roles: list = None, required_permissions: list = None):

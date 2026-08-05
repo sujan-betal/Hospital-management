@@ -36,7 +36,9 @@ export interface Appointment {
   specialty: string
   date: string
   time: string
-  status: "SCHEDULED" | "CHECKED-IN" | "CANCELLED"
+  fee: number
+  payment_status: string
+  status: "SCHEDULED" | "CHECKED-IN" | "COMPLETED" | "CANCELLED"
 }
 
 export interface AppointmentPayload {
@@ -85,6 +87,25 @@ export interface DashboardStats {
   occupancy_rate: number
   pending_tasks: number
   admitted: number
+}
+
+export interface Bed {
+  id: number
+  bed_id: string
+  ward: string
+  status: "AVAILABLE" | "OCCUPIED" | "SANITIZING" | "RESERVED"
+  price: number
+  floor: number
+  assigned_nurse: string | null
+  equipment: string[]
+  patient: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface BedStatusUpdatePayload {
+  status?: string
+  patient?: string
 }
 
 export interface ApiResponse<T> {
@@ -146,4 +167,14 @@ export async function deleteInvoice(invoiceId: string) {
 
 export async function getDashboard() {
   return api.get<ApiResponse<DashboardStats>>("/api/receptionist/dashboard")
+}
+
+// ─── Ward / Bed Management ──────────────────────────────────
+
+export async function listBeds() {
+  return api.get<ApiResponse<Bed[]>>("/api/receptionist/beds")
+}
+
+export async function updateBedStatus(bedId: string, payload: BedStatusUpdatePayload) {
+  return api.put<ApiResponse<Bed>>(`/api/receptionist/beds/${bedId}`, payload)
 }

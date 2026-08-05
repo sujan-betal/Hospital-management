@@ -9,7 +9,6 @@ load_dotenv(".env")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
 import uvicorn
 
 from src.modules.admin.admin_routes import router as admin_router
@@ -19,43 +18,27 @@ from src.modules.receptionist.receptionist_routes import router as receptionist_
 from src.modules.patient.patient_routes import router as patient_router
 
 
-async def ensure_schema():
-    """Create any missing tables (doctors, patients, receptionists,
-    permissions, ...) and backfill columns for the auth flow."""
-    from src.config.base import Base
-    from src.config.database import engine
-    # Import all models so they register on Base.metadata.
-    from src.models.admin_model import Admin  # noqa: F401
-    from src.models.doctor_model import Doctor  # noqa: F401
-    from src.models.patient_model import Patient  # noqa: F401
-    from src.models.receptionist_model import Receptionist  # noqa: F401
-    from src.models.permission_model import Permission  # noqa: F401
-    from src.models.bed_model import Bed  # noqa: F401
-    from src.models.admission_model import Admission  # noqa: F401
-    from src.models.task_model import ClinicalTask  # noqa: F401
-    from src.models.hospital_setting_model import HospitalSetting  # noqa: F401
-    from src.models.opd_appointment_model import OpdAppointment  # noqa: F401
-    from src.models.invoice_model import Invoice  # noqa: F401
+async def run_migrations():
+    """Apply Alembic migrations (schema/column changes) before serving.
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    Schema changes live in alembic/versions/ instead of app code, so this is
+    a thin wrapper around `alembic upgrade head`. Runs in a subprocess to
+    avoid event-loop conflicts with the async app.
+    """
+    import subprocess
+    import sys
 
-    statements = [
-        "ALTER TABLE doctors ADD COLUMN IF NOT EXISTS phone VARCHAR",
-        "ALTER TABLE doctors ADD COLUMN IF NOT EXISTS department VARCHAR",
-        "ALTER TABLE doctors ADD COLUMN IF NOT EXISTS token TEXT",
-        "ALTER TABLE doctors ADD COLUMN IF NOT EXISTS is_reset BOOLEAN DEFAULT FALSE",
-        "ALTER TABLE doctors ADD COLUMN IF NOT EXISTS created_by UUID",
-        "ALTER TABLE patients ADD COLUMN IF NOT EXISTS age INTEGER",
-        "ALTER TABLE patients ADD COLUMN IF NOT EXISTS gender VARCHAR",
-        "ALTER TABLE patients ADD COLUMN IF NOT EXISTS insurance_provider VARCHAR",
-        "ALTER TABLE patients ADD COLUMN IF NOT EXISTS otp_code TEXT",
-        "ALTER TABLE patients ADD COLUMN IF NOT EXISTS otp_expiry TIMESTAMPTZ",
-        "ALTER TABLE invoices ADD COLUMN IF NOT EXISTS patient_phone VARCHAR",
-    ]
-    async with engine.begin() as conn:
-        for statement in statements:
-            await conn.execute(text(statement))
+    backend_dir = os.path.dirname(os.path.abspath(__file__))
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=backend_dir,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"alembic upgrade head failed:\n{result.stdout}\n{result.stderr}"
+        )
 
 
 async def seed_hospital_data():
@@ -137,12 +120,51 @@ async def seed_receptionist_data():
         await db.commit()
 
 
+async def seed_demo_doctors():
+    """Insert demo doctors (with ratings) only when the hospital has fewer
+    than 5 active doctors, so real admin-created directories stay intact."""
+    import os
+
+    from sqlalchemy import func, select
+
+    from src.config.database import SessionLocal
+    from src.models.doctor_model import Doctor
+    from src.modules.doctor.seed_data import DEMO_DOCTORS
+    from src.utils.security import get_password_hash
+
+    async with SessionLocal() as db:
+        active = (
+            await db.execute(
+                select(func.count()).select_from(Doctor).where(
+                    Doctor.status == "ACTIVE"
+                )
+            )
+        ).scalar_one()
+
+        if active < 5:
+            existing_emails = {
+                row[0]
+                for row in (await db.execute(select(Doctor.email))).all()
+            }
+            for demo in DEMO_DOCTORS:
+                if demo["email"] not in existing_emails:
+                    row = dict(demo)
+                    # Demo doctors can't log in until an admin resets their
+                    # password; they exist as directory entries for booking.
+                    row["password"] = get_password_hash(os.urandom(24).hex())
+                    row["is_reset"] = True
+                    db.add(Doctor(**row))
+            await db.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("[STARTUP] Hospital Management backend running.")
     try:
-        await ensure_schema()
-        print("[STARTUP] Schema up to date (all tables present).")
+        await run_migrations()
+        print("[STARTUP] Schema migrations applied (alembic upgrade head).")
+        await seed_demo_doctors()
+        print("[STARTUP] Demo doctor directory ensured.")
         await seed_hospital_data()
         print("[STARTUP] Demo hospital data seeded (if tables were empty).")
         await seed_receptionist_data()

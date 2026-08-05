@@ -5,12 +5,15 @@ service layer stays clean and each helper is reusable.
 """
 
 import re
+import random
+import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.doctor_model import Doctor
+from src.models.doctor_review_model import DoctorReview
 from src.models.invoice_model import Invoice
 from src.models.opd_appointment_model import OpdAppointment
 from src.models.patient_model import Patient
@@ -78,14 +81,80 @@ def appointment_to_dict(appt: OpdAppointment) -> dict:
         "appointment_id": appt.appointment_id,
         "patient_name": appt.patient_name,
         "patient_phone": appt.patient_phone or "",
+        "patient_user_id": appt.patient_user_id or "",
         "doctor_name": appt.doctor_name,
         "specialty": appt.specialty,
         "date": appt.date,
         "time": appt.time,
         "status": appt.status,
+        "fee": appt.fee or 150,
+        "payment_status": appt.payment_status or "UNPAID",
+        "payment_id": appt.payment_id or "",
+        "razorpay_order_id": appt.razorpay_order_id or "",
         "created_at": appt.created_at,
         "updated_at": appt.updated_at,
     }
+
+
+async def find_appointment_by_appointment_id(
+    db: AsyncSession, appointment_id: str
+) -> OpdAppointment | None:
+    result = await db.execute(
+        select(OpdAppointment).where(
+            OpdAppointment.appointment_id == appointment_id
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def find_slot_booking(
+    db: AsyncSession,
+    doctor_name: str,
+    date: str,
+    time: str,
+    exclude_appointment_id: str | None = None,
+) -> OpdAppointment | None:
+    """Return an ACTIVE appointment that already holds the given
+    doctor/date/time slot, so the same time can't be booked twice."""
+    query = select(OpdAppointment).where(
+        OpdAppointment.doctor_name == doctor_name,
+        OpdAppointment.date == date,
+        OpdAppointment.time == time,
+        OpdAppointment.status != "CANCELLED",
+    )
+    if exclude_appointment_id:
+        query = query.where(
+            OpdAppointment.appointment_id != exclude_appointment_id
+        )
+    result = await db.execute(query)
+    return result.scalars().first()
+
+
+def patient_owns_appointment(appt: OpdAppointment, patient: Patient) -> bool:
+    """Check that an appointment belongs to the logged-in patient. Newer
+    bookings store the patient user_id; older ones are matched by phone."""
+    if appt.patient_user_id:
+        return appt.patient_user_id == str(patient.user_id)
+    if patient.phone and appt.patient_phone:
+        return normalize_phone(appt.patient_phone) == normalize_phone(patient.phone)
+    if patient.user_name:
+        return (appt.patient_name or "").strip().lower() == patient.user_name.strip().lower()
+    return False
+
+
+async def find_booked_slots(db: AsyncSession, date: str) -> list:
+    """Return every active (doctor_name, time) pair already taken on a date,
+    so the booking UI can disable slots booked by anyone."""
+    result = await db.execute(
+        select(OpdAppointment.doctor_name, OpdAppointment.time).where(
+            OpdAppointment.date == date,
+            OpdAppointment.status != "CANCELLED",
+        )
+    )
+    return [
+        {"doctor_name": row[0], "time": row[1]}
+        for row in result.all()
+    ]
 
 
 def invoice_to_dict(invoice: Invoice) -> dict:
@@ -129,6 +198,10 @@ async def list_active_doctors(db: AsyncSession) -> list:
             "department": doc.department,
             "email": doc.email,
             "phone": doc.phone,
+            "rating": round(float(doc.rating), 1) if doc.rating is not None else 4.0,
+            "review_count": doc.review_count or 0,
+            "experience_years": doc.experience_years or 0,
+            "is_top_rated": (doc.rating or 4.0) >= 4.5,
         }
         for doc in doctors
     ]
@@ -137,6 +210,7 @@ async def list_active_doctors(db: AsyncSession) -> list:
 async def find_patient_appointments(db: AsyncSession, patient: Patient) -> list:
     """Return the patient's OPD appointments, matched primarily by phone
     and falling back to their display name."""
+    user_id = str(patient.user_id)
     phone = normalize_phone(patient.phone or "")
     name = (patient.user_name or "").strip().lower()
     appointments = (
@@ -154,7 +228,9 @@ async def find_patient_appointments(db: AsyncSession, patient: Patient) -> list:
     for appt in appointments:
         appt_phone = normalize_phone(appt.patient_phone or "")
         appt_name = (appt.patient_name or "").strip().lower()
-        if phone and appt_phone == phone:
+        if appt.patient_user_id and appt.patient_user_id == user_id:
+            matches.append(appt)
+        elif phone and appt_phone == phone:
             matches.append(appt)
         elif phone and not appt_phone and name and appt_name == name:
             matches.append(appt)
@@ -188,3 +264,81 @@ async def find_patient_invoices(db: AsyncSession, patient: Patient) -> list:
         elif not phone and name and inv_name == name:
             matches.append(invoice)
     return matches
+
+
+# ─────────────────────── Doctor reviews ───────────────────────
+
+async def generate_review_id(db: AsyncSession) -> str:
+    """Create a unique public review id like REV-1234."""
+    for _ in range(30):
+        value = f"REV-{random.randint(1000, 9999)}"
+        result = await db.execute(
+            select(DoctorReview.id).where(DoctorReview.review_id == value)
+        )
+        if result.scalar_one_or_none() is None:
+            return value
+    return f"REV-{uuid.uuid4().hex[:6].upper()}"
+
+
+def review_to_dict(review: DoctorReview) -> dict:
+    return {
+        "id": review.id,
+        "review_id": review.review_id,
+        "appointment_id": review.appointment_id,
+        "doctor_id": review.doctor_id or "",
+        "doctor_name": review.doctor_name,
+        "specialty": review.specialty or "",
+        "patient_user_id": review.patient_user_id,
+        "patient_name": review.patient_name or "",
+        "rating": review.rating,
+        "comment": review.comment or "",
+        "created_at": review.created_at,
+        "updated_at": review.updated_at,
+    }
+
+
+async def find_review_by_appointment(
+    db: AsyncSession, appointment_id: str
+) -> DoctorReview | None:
+    result = await db.execute(
+        select(DoctorReview).where(
+            DoctorReview.appointment_id == appointment_id
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def find_patient_reviews(db: AsyncSession, patient: Patient) -> list:
+    """Return every review the patient has left, newest first."""
+    reviews = (
+        (
+            await db.execute(
+                select(DoctorReview)
+                .where(DoctorReview.patient_user_id == str(patient.user_id))
+                .order_by(DoctorReview.created_at.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [review_to_dict(r) for r in reviews]
+
+
+async def find_doctor_by_name(db: AsyncSession, doctor_name: str) -> Doctor | None:
+    result = await db.execute(
+        select(Doctor).where(Doctor.user_name == doctor_name)
+    )
+    return result.scalar_one_or_none()
+
+
+async def recompute_doctor_rating(db: AsyncSession, doctor: Doctor, new_rating: int) -> None:
+    """Fold a new review into a doctor's aggregate rating as a weighted
+    average against the existing baseline (seeded + prior real reviews),
+    so the directory rating and review count grow smoothly."""
+    prev_rating = float(doctor.rating) if doctor.rating is not None else 4.0
+    prev_count = int(doctor.review_count) if doctor.review_count is not None else 0
+    new_count = prev_count + 1
+    doctor.rating = round(
+        ((prev_rating * prev_count) + new_rating) / new_count, 2
+    )
+    doctor.review_count = new_count

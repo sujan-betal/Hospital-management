@@ -18,6 +18,7 @@ from src.modules.admin.admin_service import (
     create_subadmin_service,
     delete_staff_service,
     list_doctors_service,
+    list_permissions_service,
     list_staff_service,
     login_staff_service,
     register_admin_service,
@@ -43,7 +44,12 @@ async def login_admin(
 @router.post("/subadmins")
 async def create_subadmin(
     payload: SubAdminCreateRequest,
-    admin=Depends(authorization(allowed_roles=["ADMIN"])),
+    admin=Depends(
+        authorization(
+            allowed_roles=["ADMIN", "SUBADMIN"],
+            required_permissions=["SUBADMIN_CREATE"],
+        )
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     return await create_subadmin_service(payload, admin.user_id, db)
@@ -51,10 +57,22 @@ async def create_subadmin(
 @router.put("/permissions")
 async def assign_permissions(
     payload: PermissionAssignRequest,
-    admin=Depends(authorization(allowed_roles=["ADMIN"])),
+    admin=Depends(
+        authorization(
+            allowed_roles=["ADMIN", "SUBADMIN"],
+            required_permissions=["SUBADMIN_CREATE"],
+        )
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     return await assign_permissions_service(payload, db)
+
+@router.get("/permissions")
+async def list_permissions(
+    admin=Depends(authorization(allowed_roles=["ADMIN", "SUBADMIN"])),
+    db: AsyncSession = Depends(get_db),
+):
+    return await list_permissions_service(db)
 
 @router.get("/doctors")
 async def list_doctors(
@@ -75,7 +93,12 @@ async def list_staff(
 async def update_staff(
     user_id: uuid_lib.UUID,
     payload: StaffUpdateRequest,
-    admin=Depends(authorization(allowed_roles=["ADMIN"])),
+    admin=Depends(
+        authorization(
+            allowed_roles=["ADMIN", "SUBADMIN"],
+            required_permissions=["STAFF_MANAGE"],
+        )
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     return await update_staff_service(user_id, payload, db)
@@ -83,7 +106,12 @@ async def update_staff(
 @router.delete("/staff/{user_id}")
 async def delete_staff(
     user_id: uuid_lib.UUID,
-    admin=Depends(authorization(allowed_roles=["ADMIN"])),
+    admin=Depends(
+        authorization(
+            allowed_roles=["ADMIN", "SUBADMIN"],
+            required_permissions=["STAFF_MANAGE"],
+        )
+    ),
     db: AsyncSession = Depends(get_db),
 ):
     return await delete_staff_service(user_id, admin, db)

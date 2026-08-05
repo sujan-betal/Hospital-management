@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.admin_model import Admin
 from src.models.doctor_model import Doctor
+from src.models.receptionist_model import Receptionist
 from src.utils.common_schema import api_response_error, api_response_success
 from src.utils.email import send_password_reset_email
 from src.utils.security import (
@@ -31,6 +32,10 @@ def format_doctor_data(doctor: Doctor) -> dict:
         "status": doctor.status,
         "phone": doctor.phone,
         "department": doctor.department,
+        "rating": round(float(doctor.rating), 1) if doctor.rating is not None else 4.0,
+        "review_count": doctor.review_count or 0,
+        "experience_years": doctor.experience_years or 0,
+        "is_top_rated": (doctor.rating or 4.0) >= 4.5,
     }
 
 
@@ -233,6 +238,25 @@ async def forgot_password_service(payload, db: AsyncSession):
                 reset_minutes=RESET_TOKEN_EXPIRE_MINUTES,
             )
 
+        receptionist_query = select(Receptionist).where(
+            or_(Receptionist.email == email, Receptionist.user_name == email)
+        )
+        receptionist_result = await db.execute(receptionist_query)
+        receptionist = receptionist_result.scalar_one_or_none()
+
+        if receptionist:
+            reset_token = _create_reset_token(receptionist.user_id, receptionist.role)
+            receptionist.token = reset_token
+            receptionist.is_reset = True
+            await db.commit()
+
+            send_password_reset_email(
+                to_email=receptionist.email,
+                full_name=receptionist.user_name,
+                reset_link=_build_reset_link(reset_token),
+                reset_minutes=RESET_TOKEN_EXPIRE_MINUTES,
+            )
+
         # Always return the same generic response to avoid leaking accounts.
         return api_response_success(
             data=None,
@@ -249,7 +273,7 @@ async def forgot_password_service(payload, db: AsyncSession):
 
 
 async def reset_password_service(payload, db: AsyncSession):
-    """Set a new password using a valid reset token (doctors and admins)."""
+    """Set a new password using a valid reset token (doctors, admins, receptionists)."""
     try:
         try:
             decoded = jwt.decode(
@@ -278,6 +302,11 @@ async def reset_password_service(payload, db: AsyncSession):
         if role == "DOCTOR":
             result = await db.execute(
                 select(Doctor).where(Doctor.user_id == user_uuid)
+            )
+            account = result.scalar_one_or_none()
+        elif role == "RECEPTIONIST":
+            result = await db.execute(
+                select(Receptionist).where(Receptionist.user_id == user_uuid)
             )
             account = result.scalar_one_or_none()
         elif role in ("ADMIN", "SUBADMIN"):

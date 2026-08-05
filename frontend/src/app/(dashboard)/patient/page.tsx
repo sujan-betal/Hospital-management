@@ -17,19 +17,32 @@ import {
   Smartphone,
   ArrowRight,
   FileWarning,
-  RefreshCw,
   AlertTriangle,
-  X
+  X,
+  Pencil,
+  Wallet,
+  Loader2,
+  CalendarClock,
+  Star,
+  Award,
+  Users,
+  SortDesc
 } from "lucide-react"
 import {
   bookPatientAppointment,
+  createPatientPaymentOrder,
+  getBookedSlots,
   getPatientAppointments,
   getPatientDoctors,
   getPatientInvoices,
   getPatientProfile,
-  updatePatientProfile
+  getPatientReviews,
+  submitDoctorReview,
+  updatePatientAppointment,
+  updatePatientProfile,
+  verifyPatientPayment
 } from "@/services/patient.service"
-import type { Doctor, PatientAppointment, PatientInvoice } from "@/services/patient.service"
+import type { Doctor, DoctorReview, PatientAppointment, PatientInvoice } from "@/services/patient.service"
 
 const SLOTS = ["09:30 AM", "10:15 AM", "11:00 AM", "01:15 PM", "03:30 PM", "04:45 PM"]
 
@@ -58,6 +71,35 @@ export default function PatientDashboard() {
   const [booking, setBooking] = useState(false)
 
   const [selectedSpecialty, setSelectedSpecialty] = useState("All Specialties")
+  const [doctorSort, setDoctorSort] = useState<"top" | "name">("top")
+
+  // Today's date in the browser's local timezone (booking only offers today).
+  const [today] = useState(() => {
+    const d = new Date()
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+    return local.toISOString().split("T")[0]
+  })
+
+  // Slots already taken by ANY patient today, so they render as disabled.
+  const [bookedSlots, setBookedSlots] = useState<{ doctor_name: string; time: string }[]>([])
+
+  // Edit-appointment modal state.
+  const [editingAppointment, setEditingAppointment] = useState<PatientAppointment | null>(null)
+  const [editDate, setEditDate] = useState("")
+  const [editTime, setEditTime] = useState("")
+  const [savingEdit, setSavingEdit] = useState(false)
+
+  // Payment flow state.
+  const [payingAppointmentId, setPayingAppointmentId] = useState<string | null>(null)
+
+  // Doctor review state.
+  const [reviews, setReviews] = useState<DoctorReview[]>([])
+  const [reviewingAppointment, setReviewingAppointment] = useState<PatientAppointment | null>(null)
+  const [reviewRating, setReviewRating] = useState(0)
+  const [reviewComment, setReviewComment] = useState("")
+  const [reviewHover, setReviewHover] = useState(0)
+  const [reviewSubmitting, setReviewSubmitting] = useState(false)
+  const [reviewError, setReviewError] = useState("")
 
   useEffect(() => {
     const updateTime = () => {
@@ -94,15 +136,18 @@ export default function PatientDashboard() {
   const loadRecords = async () => {
     setLoadingRecords(true)
     try {
-      const [apptRes, invRes] = await Promise.all([
+      const [apptRes, invRes, revRes] = await Promise.all([
         getPatientAppointments(),
         getPatientInvoices(),
+        getPatientReviews(),
       ])
       setAppointments(apptRes?.data || [])
       setInvoices(invRes?.data || [])
+      setReviews(revRes?.data || [])
     } catch {
       setAppointments([])
       setInvoices([])
+      setReviews([])
     } finally {
       setLoadingRecords(false)
     }
@@ -117,11 +162,37 @@ export default function PatientDashboard() {
     }
   }
 
+  const loadBookedSlots = async () => {
+    try {
+      const res = await getBookedSlots(today)
+      setBookedSlots(res?.data || [])
+    } catch {
+      // Keep whatever we already have.
+    }
+  }
+
   useEffect(() => {
     loadProfile()
     loadRecords()
     loadDoctors()
+    loadBookedSlots()
   }, [])
+
+  // Every active slot already taken today (from other patients + our own).
+  const bookedSlotsByDoctor = useMemo(() => {
+    const map: Record<string, Set<string>> = {}
+    const collect = (doctorName: string, time: string) => {
+      if (!map[doctorName]) map[doctorName] = new Set()
+      map[doctorName].add(time)
+    }
+    bookedSlots.forEach((s) => collect(s.doctor_name, s.time))
+    appointments.forEach((a) => {
+      if (a.date === today && a.status.toUpperCase() !== "CANCELLED") {
+        collect(a.doctor_name, a.time)
+      }
+    })
+    return map
+  }, [bookedSlots, appointments, today])
 
   const metrics = useMemo(() => {
     const upcoming = appointments.filter(
@@ -135,16 +206,92 @@ export default function PatientDashboard() {
 
   const filteredDoctors = useMemo(() => {
     const list = selectedSpecialty === "All Specialties"
-      ? doctors
+      ? [...doctors]
       : doctors.filter((d) => d.specialty === selectedSpecialty)
+    if (doctorSort === "name") {
+      list.sort((a, b) => a.name.localeCompare(b.name))
+    } else {
+      list.sort((a, b) => (b.rating || 0) - (a.rating || 0))
+    }
     return list
-  }, [doctors, selectedSpecialty])
+  }, [doctors, selectedSpecialty, doctorSort])
+
+  // Count of doctors per specialty (for the filter chips + summary header).
+  const specialtyCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    doctors.forEach((d) => {
+      const key = d.specialty || "General Medicine"
+      counts[key] = (counts[key] || 0) + 1
+    })
+    return counts
+  }, [doctors])
+
+  const topRatedCount = useMemo(
+    () => doctors.filter((d) => d.is_top_rated).length,
+    [doctors]
+  )
+
+  const renderStars = (rating: number) => {
+    return (
+      <div className="flex items-center gap-0.5" aria-label={`${rating} out of 5 stars`}>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <Star
+            key={i}
+            className={`h-3.5 w-3.5 ${i <= Math.round(rating) ? "fill-amber-400 text-amber-400" : "text-[#D7E2DC] fill-[#E8ECEB]"}`}
+          />
+        ))}
+      </div>
+    )
+  }
+
+  // Appointments the patient has already reviewed (one review per visit).
+  const reviewedAppointmentIds = useMemo(
+    () => new Set(reviews.map((r) => r.appointment_id)),
+    [reviews]
+  )
+
+  const openReviewModal = (appt: PatientAppointment) => {
+    setReviewingAppointment(appt)
+    setReviewRating(0)
+    setReviewComment("")
+    setReviewHover(0)
+    setReviewError("")
+  }
+
+  const handleSubmitReview = async () => {
+    if (!reviewingAppointment) return
+    setReviewError("")
+    if (reviewRating < 1) {
+      setReviewError("Please select a star rating before submitting.")
+      return
+    }
+    setReviewSubmitting(true)
+    try {
+      const res = await submitDoctorReview({
+        appointment_id: reviewingAppointment.appointment_id,
+        rating: reviewRating,
+        comment: reviewComment.trim(),
+      })
+      if (res?.data) {
+        setReviews((prev) => [res.data, ...prev])
+        setReviewingAppointment(null)
+        setBookingSuccess(
+          `Thank you for rating Dr. ${reviewingAppointment.doctor_name}!`
+        )
+        setTimeout(() => setBookingSuccess(""), 6000)
+      }
+    } catch (err: any) {
+      setReviewError(err?.message || "Could not submit your review. Please try again.")
+    } finally {
+      setReviewSubmitting(false)
+    }
+  }
 
   const handleBookSlot = async (doc: Doctor, slot: string) => {
     setBookingError("")
+    setBookingSuccess("")
     setBooking(true)
     try {
-      const today = new Date().toISOString().split("T")[0]
       const res = await bookPatientAppointment({
         doctor_name: doc.name,
         specialty: doc.specialty,
@@ -153,8 +300,11 @@ export default function PatientDashboard() {
       })
       const created = res?.data
       if (created) setAppointments((prev) => [created, ...prev])
-      setBookingSuccess(`Your consultation with ${doc.name} is booked for ${slot} today!`)
-      setTimeout(() => setBookingSuccess(""), 6000)
+      setBookingSuccess(
+        `Booking successful! Your consultation with ${doc.name} is confirmed for ${slot} today.`
+      )
+      loadBookedSlots()
+      setTimeout(() => setBookingSuccess(""), 7000)
     } catch (err: any) {
       setBookingError(
         err?.message ||
@@ -162,6 +312,126 @@ export default function PatientDashboard() {
       )
     } finally {
       setBooking(false)
+    }
+  }
+
+  const openEditModal = (appt: PatientAppointment) => {
+    setEditingAppointment(appt)
+    setEditDate(appt.date)
+    setEditTime(appt.time)
+    setBookingError("")
+    setBookingSuccess("")
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingAppointment) return
+    setBookingError("")
+    setBookingSuccess("")
+    if (!editDate || !editTime) {
+      setBookingError("Please choose both a date and a time.")
+      return
+    }
+    setSavingEdit(true)
+    try {
+      const res = await updatePatientAppointment(editingAppointment.appointment_id, {
+        date: editDate,
+        time: editTime,
+      })
+      const updated = res?.data
+      if (updated) {
+        setAppointments((prev) =>
+          prev.map((a) =>
+            a.appointment_id === updated.appointment_id ? { ...a, ...updated } : a
+          )
+        )
+      }
+      setBookingSuccess("Appointment rescheduled successfully!")
+      loadBookedSlots()
+      setTimeout(() => setBookingSuccess(""), 6000)
+      setEditingAppointment(null)
+    } catch (err: any) {
+      setBookingError(err?.message || "Could not reschedule the appointment. Please try again.")
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  // Load the Razorpay checkout script once, then return it.
+  const loadRazorpay = (): Promise<any> => {
+    return new Promise((resolve) => {
+      if ((window as any).Razorpay) {
+        resolve((window as any).Razorpay)
+        return
+      }
+      const script = document.createElement("script")
+      script.src = "https://checkout.razorpay.com/v1/checkout.js"
+      script.onload = () => resolve((window as any).Razorpay)
+      script.onerror = () => resolve(null)
+      document.body.appendChild(script)
+    })
+  }
+
+  const handlePayNow = async (appt: PatientAppointment) => {
+    setBookingError("")
+    setBookingSuccess("")
+    setPayingAppointmentId(appt.appointment_id)
+    try {
+      const orderRes = await createPatientPaymentOrder(appt.appointment_id)
+      const order = orderRes?.data
+      if (!order?.order_id) throw new Error("Could not start payment. Please try again.")
+
+      const Razorpay = await loadRazorpay()
+      if (!Razorpay) {
+        throw new Error("Payment gateway could not be loaded. Please check your connection.")
+      }
+
+      const options = {
+        key: order.key_id,
+        amount: order.amount,
+        currency: order.currency,
+        name: "Aura Medical Center",
+        description: `OPD Consultation – ${appt.doctor_name}`,
+        order_id: order.order_id,
+        prefill: {
+          name: profile.fullName,
+          contact: profile.phone,
+          email: profile.email,
+        },
+        handler: async (response: any) => {
+          try {
+            const verifyRes = await verifyPatientPayment(appt.appointment_id, {
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            })
+            const updated = verifyRes?.data?.appointment
+            if (updated) {
+              setAppointments((prev) =>
+                prev.map((a) =>
+                  a.appointment_id === updated.appointment_id ? { ...a, ...updated } : a
+                )
+              )
+            }
+            loadRecords()
+            setBookingSuccess("Payment successful! Your consultation fee is paid and the appointment is confirmed.")
+            setTimeout(() => setBookingSuccess(""), 8000)
+          } catch (err: any) {
+            setBookingError(err?.message || "Payment was made but could not be verified. Please contact the front desk.")
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setBookingSuccess("Payment cancelled. You can pay later from My Appointments.")
+          },
+        },
+      }
+
+      const rzp = new Razorpay(options)
+      rzp.open()
+    } catch (err: any) {
+      setBookingError(err?.message || "Could not start payment. Please try again.")
+    } finally {
+      setPayingAppointmentId(null)
     }
   }
 
@@ -409,15 +679,71 @@ export default function PatientDashboard() {
                             </p>
                           </div>
                         </div>
-                        <span className={`self-start md:self-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                          appt.status.toUpperCase() === "CANCELLED"
-                            ? "bg-rose-50 text-rose-700 border border-rose-200"
-                            : appt.status.toUpperCase() === "COMPLETED"
-                            ? "bg-blue-50 text-blue-700 border border-blue-200"
-                            : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                        }`}>
-                          {appt.status}
-                        </span>
+                        <div className="self-start md:self-center flex flex-col items-start md:items-end gap-2">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            appt.status.toUpperCase() === "CANCELLED"
+                              ? "bg-rose-50 text-rose-700 border border-rose-200"
+                              : appt.status.toUpperCase() === "COMPLETED"
+                              ? "bg-blue-50 text-blue-700 border border-blue-200"
+                              : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          }`}>
+                            {appt.status}
+                          </span>
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                            (appt.payment_status || "UNPAID").toUpperCase() === "PAID"
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : "bg-amber-50 text-amber-700 border border-amber-200"
+                          }`}>
+                            Fee: Rs. {appt.fee ?? 150} · {(appt.payment_status || "UNPAID")}
+                          </span>
+                              {(appt.status.toUpperCase() === "SCHEDULED") && (
+                                <div className="flex items-center gap-2 mt-1">
+                                  <button
+                                    onClick={() => openEditModal(appt)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#D7E2DC] text-[#12463E] hover:bg-[#EEF4F1] text-[11px] font-bold transition-all"
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                    Edit Timing
+                                  </button>
+                                  {(appt.payment_status || "UNPAID").toUpperCase() !== "PAID" && (
+                                    <button
+                                      onClick={() => handlePayNow(appt)}
+                                      disabled={payingAppointmentId === appt.appointment_id}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#12463E] hover:bg-[#0B2B26] text-white text-[11px] font-bold transition-all disabled:opacity-50"
+                                    >
+                                      {payingAppointmentId === appt.appointment_id ? (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                      ) : (
+                                        <Wallet className="h-3 w-3" />
+                                      )}
+                                      {payingAppointmentId === appt.appointment_id ? "Starting…" : "Pay Now"}
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Rate the doctor after a completed visit */}
+                              {(["CHECKED-IN", "COMPLETED"] as string[]).includes(
+                                appt.status.toUpperCase()
+                              ) && (
+                                <div className="flex items-center gap-2 mt-1">
+                                  {reviewedAppointmentIds.has(appt.appointment_id) ? (
+                                    <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-bold">
+                                      <CheckCircle className="h-3 w-3" />
+                                      Reviewed
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() => openReviewModal(appt)}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 text-[11px] font-bold transition-all"
+                                    >
+                                      <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                                      Rate Doctor
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                        </div>
                       </div>
                     ))
                   )}
@@ -490,25 +816,55 @@ export default function PatientDashboard() {
               <div className="bg-white border border-[#E8ECEB] rounded-3xl p-6 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                   <h2 className="text-lg font-bold text-[#0B2B26]">Book Consultation / Doctor Slot</h2>
-                  <p className="text-xs text-[#6B8078] mt-1">Select a specialty to filter the hospital&apos;s doctors</p>
+                  <p className="text-xs text-[#6B8078] mt-1">Browse the hospital&apos;s doctors by specialty &amp; rating, then pick a slot</p>
                 </div>
 
-                {/* Filters */}
-                <div className="flex flex-wrap gap-2">
-                  {["All Specialties", ...Array.from(new Set(doctors.map((d) => d.specialty)))].map((sp) => (
-                    <button
-                      key={sp}
-                      onClick={() => setSelectedSpecialty(sp)}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
-                        selectedSpecialty === sp
-                          ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/10"
-                          : "bg-white border-[#D7E2DC] text-[#4B5F58] hover:border-[#12463E]"
-                      }`}
-                    >
-                      {sp}
-                    </button>
-                  ))}
+                {/* Directory summary */}
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#EEF4F1] border border-[#D7E2DC] text-[#12463E] text-xs font-bold">
+                    <Users className="h-3.5 w-3.5" />
+                    {doctors.length} Doctors
+                  </span>
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold">
+                    <Award className="h-3.5 w-3.5" />
+                    {topRatedCount} Top Rated
+                  </span>
+                  <button
+                    onClick={() => setDoctorSort(doctorSort === "top" ? "name" : "top")}
+                    title="Sort doctors by rating or by name"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#D7E2DC] text-[#12463E] hover:bg-[#EEF4F1] text-xs font-bold transition-all"
+                  >
+                    <SortDesc className="h-3.5 w-3.5" />
+                    {doctorSort === "top" ? "Top Rated" : "Name A–Z"}
+                  </button>
                 </div>
+              </div>
+
+              {/* Specialty filter chips with counts */}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setSelectedSpecialty("All Specialties")}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                    selectedSpecialty === "All Specialties"
+                      ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/10"
+                      : "bg-white border-[#D7E2DC] text-[#4B5F58] hover:border-[#12463E]"
+                  }`}
+                >
+                  All Specialties ({doctors.length})
+                </button>
+                {Array.from(new Set(doctors.map((d) => d.specialty))).map((sp) => (
+                  <button
+                    key={sp}
+                    onClick={() => setSelectedSpecialty(sp)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                      selectedSpecialty === sp
+                        ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/10"
+                        : "bg-white border-[#D7E2DC] text-[#4B5F58] hover:border-[#12463E]"
+                    }`}
+                  >
+                    {sp} ({specialtyCounts[sp] || 0})
+                  </button>
+                ))}
               </div>
 
               {doctors.length === 0 ? (
@@ -529,10 +885,32 @@ export default function PatientDashboard() {
                             {doc.name.split(" ").slice(1).map((n) => n[0]).join("") || doc.name.slice(0, 2).toUpperCase()}
                           </div>
                           <div>
-                            <h3 className="font-bold text-[#0B2B26] text-base">{doc.name}</h3>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-bold text-[#0B2B26] text-base">{doc.name}</h3>
+                              {doc.is_top_rated && (
+                                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-700 text-[9px] font-bold uppercase tracking-wide">
+                                  <Award className="h-2.5 w-2.5" /> Top Rated
+                                </span>
+                              )}
+                            </div>
                             <span className="text-xs bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded font-medium mt-1 inline-block">
                               {doc.specialty}
                             </span>
+                            {/* Rating */}
+                            <div className="flex items-center gap-2 mt-1.5">
+                              {renderStars(doc.rating || 0)}
+                              <span className="text-xs font-bold text-[#0B2B26]">
+                                {(doc.rating || 0).toFixed(1)}
+                              </span>
+                              <span className="text-[10px] text-[#8AA098]">
+                                · {doc.review_count || 0} reviews
+                              </span>
+                            </div>
+                            {doc.experience_years ? (
+                              <p className="text-[10px] text-[#8AA098] mt-0.5">
+                                {doc.experience_years}+ years experience
+                              </p>
+                            ) : null}
                           </div>
                         </div>
 
@@ -540,16 +918,26 @@ export default function PatientDashboard() {
                         <div className="mt-5 space-y-2">
                           <span className="text-[10px] font-bold text-[#8AA098] uppercase tracking-wider block">Available Slots today</span>
                           <div className="flex flex-wrap gap-2">
-                            {SLOTS.map((slot) => (
-                              <button
-                                key={slot}
-                                disabled={booking}
-                                onClick={() => handleBookSlot(doc, slot)}
-                                className="px-3.5 py-2 bg-[#F6F8F7] hover:bg-[#12463E] hover:text-white border border-[#D7E2DC] text-xs font-semibold rounded-xl transition-all font-mono disabled:opacity-50"
-                              >
-                                {slot}
-                              </button>
-                            ))}
+                            {SLOTS.map((slot) => {
+                              const isBooked = bookedSlotsByDoctor[doc.name]?.has(slot) || false
+                              const isDisabled = booking || isBooked
+                              return (
+                                <button
+                                  key={slot}
+                                  disabled={isDisabled}
+                                  onClick={() => handleBookSlot(doc, slot)}
+                                  title={isBooked ? "This time is already booked" : `Book ${slot}`}
+                                  className={`px-3.5 py-2 text-xs font-semibold rounded-xl transition-all font-mono ${
+                                    isBooked
+                                      ? "bg-[#EEF4F1] text-[#9CAEA6] border border-[#D7E2DC] cursor-not-allowed"
+                                      : "bg-[#F6F8F7] hover:bg-[#12463E] hover:text-white border border-[#D7E2DC] text-[#0B2B26]"
+                                  } disabled:opacity-70`}
+                                >
+                                  {slot}
+                                  {isBooked && <span className="ml-1.5 text-[9px] uppercase tracking-wide font-bold text-[#C0A24A]">Booked</span>}
+                                </button>
+                              )
+                            })}
                           </div>
                         </div>
                       </div>
@@ -725,6 +1113,202 @@ export default function PatientDashboard() {
                 <LogOut className="h-4 w-4" />
                 Yes, Logout
               </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ─── RESCHEDULE APPOINTMENT MODAL ─── */}
+      {editingAppointment && (
+        <>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50" onClick={() => setEditingAppointment(null)} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-3xl border border-[#E8ECEB] shadow-2xl p-6 z-50 animate-fade-in">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center">
+                  <CalendarClock className="h-5 w-5 text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#0B2B26]">Reschedule Appointment</h3>
+                  <p className="text-xs text-[#8AA098] mt-0.5">{editingAppointment.doctor_name}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingAppointment(null)}
+                className="w-8 h-8 rounded-full bg-[#F6F8F7] hover:bg-[#EEF4F1] flex items-center justify-center transition-all text-[#6B8078]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 mt-2">
+              <div>
+                <label className="text-xs font-semibold text-[#12463E] block mb-1.5">Date</label>
+                <input
+                  type="date"
+                  value={editDate}
+                  min={today}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  className="w-full bg-[#F6F8F7] border border-[#D7E2DC] rounded-xl px-4 py-3 text-sm text-[#0B2B26]"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-[#12463E] block mb-1.5">Preferred Time</label>
+                <div className="flex flex-wrap gap-2">
+                  {SLOTS.map((slot) => {
+                    const isCurrent = slot === editTime
+                    const isTaken =
+                      editDate === today &&
+                      bookedSlotsByDoctor[editingAppointment.doctor_name]?.has(slot) &&
+                      !(editingAppointment.date === today && editingAppointment.time === slot)
+                    return (
+                      <button
+                        key={slot}
+                        type="button"
+                        disabled={isTaken}
+                        onClick={() => setEditTime(slot)}
+                        title={isTaken ? "This time is already booked" : slot}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all font-mono ${
+                          isCurrent
+                            ? "bg-[#12463E] text-white border-[#12463E]"
+                            : isTaken
+                            ? "bg-[#EEF4F1] text-[#9CAEA6] border border-[#D7E2DC] cursor-not-allowed"
+                            : "bg-[#F6F8F7] border border-[#D7E2DC] text-[#0B2B26] hover:border-[#12463E]"
+                        } disabled:opacity-70`}
+                      >
+                        {slot}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 bg-[#EEF4F1]/60 border border-[#D7E2DC] rounded-xl px-4 py-3 text-xs text-[#6B8078]">
+                <ShieldCheck className="h-4 w-4 text-[#12463E] shrink-0" />
+                <span>
+                  Rescheduling to {editDate || "…"} at {editTime || "…"}.
+                  {editDate === today && editTime !== editingAppointment.time && bookedSlotsByDoctor[editingAppointment.doctor_name]?.has(editTime)
+                    ? " This time is already booked — pick another."
+                    : " You can still reschedule again later."}
+                </span>
+              </div>
+
+              <div className="flex gap-3 mt-2">
+                <button
+                  onClick={() => setEditingAppointment(null)}
+                  className="flex-1 h-11 rounded-xl border border-[#D7E2DC] text-xs font-bold text-[#6B8078] hover:bg-[#F6F8F7] transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={savingEdit || !editDate || !editTime}
+                  className="flex-1 h-11 rounded-xl bg-[#12463E] text-white text-xs font-bold hover:bg-[#0B2B26] shadow-md shadow-emerald-500/10 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {savingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />}
+                  {savingEdit ? "Saving…" : "Save New Time"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ─── RATE DOCTOR MODAL ─── */}
+      {reviewingAppointment && (
+        <>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50" onClick={() => setReviewingAppointment(null)} />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-3xl border border-[#E8ECEB] shadow-2xl p-6 z-50 animate-fade-in">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center">
+                  <Star className="h-5 w-5 fill-amber-400 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#0B2B26]">Rate Your Doctor</h3>
+                  <p className="text-xs text-[#8AA098] mt-0.5">
+                    {reviewingAppointment.doctor_name} · {reviewingAppointment.specialty}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setReviewingAppointment(null)}
+                className="w-8 h-8 rounded-full bg-[#F6F8F7] hover:bg-[#EEF4F1] flex items-center justify-center transition-all text-[#6B8078]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 mt-2">
+              <div>
+                <label className="text-xs font-semibold text-[#12463E] block mb-2">How was your visit?</label>
+                <div className="flex items-center gap-1.5">
+                  {[1, 2, 3, 4, 5].map((i) => {
+                    const active = reviewHover ? i <= reviewHover : i <= reviewRating
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        aria-label={`${i} star${i > 1 ? "s" : ""}`}
+                        onMouseEnter={() => setReviewHover(i)}
+                        onMouseLeave={() => setReviewHover(0)}
+                        onClick={() => setReviewRating(i)}
+                        className="p-1 transition-transform hover:scale-110"
+                      >
+                        <Star
+                          className={`h-8 w-8 ${active ? "fill-amber-400 text-amber-400" : "fill-[#E8ECEB] text-[#E8ECEB]"}`}
+                        />
+                      </button>
+                    )
+                  })}
+                  <span className="ml-2 text-sm font-bold text-[#0B2B26]">
+                    {reviewRating > 0 ? reviewRating : "—"}/5
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-[#12463E] block mb-1.5">
+                  Share your feedback (optional)
+                </label>
+                <textarea
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  maxLength={2000}
+                  rows={4}
+                  placeholder="e.g. The doctor was very patient and explained everything clearly…"
+                  className="w-full bg-[#F6F8F7] border border-[#D7E2DC] rounded-xl px-4 py-3 text-sm text-[#0B2B26] resize-none focus:outline-none focus:border-[#12463E]"
+                />
+              </div>
+
+              {reviewError && (
+                <p className="text-xs font-semibold text-rose-600 flex items-center gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  {reviewError}
+                </p>
+              )}
+
+              <div className="flex gap-3 mt-2">
+                <button
+                  onClick={() => setReviewingAppointment(null)}
+                  className="flex-1 h-11 rounded-xl border border-[#D7E2DC] text-xs font-bold text-[#6B8078] hover:bg-[#F6F8F7] transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitReview}
+                  disabled={reviewSubmitting}
+                  className="flex-1 h-11 rounded-xl bg-amber-500 text-white text-xs font-bold hover:bg-amber-600 shadow-md shadow-amber-500/10 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {reviewSubmitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Star className="h-4 w-4 fill-white" />
+                  )}
+                  {reviewSubmitting ? "Submitting…" : "Submit Review"}
+                </button>
+              </div>
             </div>
           </div>
         </>

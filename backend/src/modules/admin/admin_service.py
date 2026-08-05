@@ -9,6 +9,10 @@ from src.utils.common_schema import api_response_success, api_response_error
 from src.utils.status_code import StatusCode
 from src.modules.admin.admin_schema import AdminRegisterRequest, AdminLoginRequest
 from src.modules.admin.admin_helper import format_admin_data
+from src.modules.admin.permissions_catalog import (
+    PERMISSION_CATALOG,
+    normalize_permissions,
+)
 
 VALID_STATUSES = {"ACTIVE", "SUSPENDED", "INACTIVE"}
 
@@ -33,7 +37,15 @@ def _doctor_to_dict(doctor) -> dict:
     }
 
 
-def _staff_to_dict(account):
+async def _load_admin_permissions(db: AsyncSession, admin_id: int) -> list[str]:
+    """Load the permission keys stored for an admin/subadmin account."""
+    result = await db.execute(
+        select(Permission.permission).where(Permission.admin_id == admin_id)
+    )
+    return sorted({(p or "").upper() for p in result.scalars().all() if p})
+
+
+def _staff_to_dict(account, permissions: list[str] | None = None):
     data = {
         "user_id": str(account.user_id),
         "user_name": account.user_name,
@@ -48,6 +60,15 @@ def _staff_to_dict(account):
     else:
         data["phone"] = None
         data["department"] = None
+
+    # Admin / sub-admin accounts are permission-managed.
+    if isinstance(account, Admin):
+        data["admin_id"] = account.id
+        data["permissions"] = permissions or []
+    else:
+        data["admin_id"] = None
+        data["permissions"] = []
+
     return data
 
 
@@ -94,7 +115,10 @@ async def list_staff_service(db: AsyncSession):
 
         records = []
         for account in [*admins, *doctors, *receptionists]:
-            records.append(_staff_to_dict(account))
+            permissions = None
+            if isinstance(account, Admin):
+                permissions = await _load_admin_permissions(db, account.id)
+            records.append(_staff_to_dict(account, permissions))
 
         return api_response_success(
             data=records,
@@ -378,6 +402,11 @@ async def login_staff_service(
                     message=f"Account status is {receptionist.status}",
                     status_code=StatusCode.forbidden
                 )
+            if receptionist.is_reset:
+                return api_response_error(
+                    message="Please set your password using the link sent to your email.",
+                    status_code=StatusCode.forbidden
+                )
             if not verify_password(payload.password, receptionist.password):
                 return api_response_error(
                     message="Invalid email or password",
@@ -453,14 +482,15 @@ async def create_subadmin_service(
         db.add(new_subadmin)
         await db.flush()  # assign id
 
-        for perm in payload.permissions:
-            db.add(Permission(admin_id=new_subadmin.id, permission=perm.upper()))
+        permissions = normalize_permissions(payload.permissions)
+        for perm in permissions:
+            db.add(Permission(admin_id=new_subadmin.id, permission=perm))
 
         await db.commit()
         await db.refresh(new_subadmin)
 
         admin_data = format_admin_data(new_subadmin)
-        admin_data["permissions"] = [p.upper() for p in payload.permissions]
+        admin_data["permissions"] = permissions
 
         return api_response_success(
             data=admin_data,
@@ -493,13 +523,14 @@ async def assign_permissions_service(
             )
 
         await db.execute(delete(Permission).where(Permission.admin_id == payload.admin_id))
-        for perm in payload.permissions:
-            db.add(Permission(admin_id=payload.admin_id, permission=perm.upper()))
+        permissions = normalize_permissions(payload.permissions)
+        for perm in permissions:
+            db.add(Permission(admin_id=payload.admin_id, permission=perm))
 
         await db.commit()
 
         return api_response_success(
-            data={"admin_id": payload.admin_id, "permissions": [p.upper() for p in payload.permissions]},
+            data={"admin_id": payload.admin_id, "permissions": permissions},
             message="Permissions updated successfully",
             status_code=StatusCode.success
         )
@@ -509,4 +540,19 @@ async def assign_permissions_service(
         return api_response_error(
             message=f"Failed to update permissions: {str(e)}",
             status_code=StatusCode.internalServerError
+        )
+
+
+async def list_permissions_service(db: AsyncSession):
+    """Return the catalog of assignable permissions, grouped for the UI."""
+    try:
+        return api_response_success(
+            data=PERMISSION_CATALOG,
+            message="Permission catalog fetched successfully",
+            status_code=StatusCode.success,
+        )
+    except Exception as e:
+        return api_response_error(
+            message=f"Failed to fetch permission catalog: {str(e)}",
+            status_code=StatusCode.internalServerError,
         )

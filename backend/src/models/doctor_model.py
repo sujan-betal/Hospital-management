@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, Float
 from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
@@ -32,6 +32,18 @@ class Doctor(Base):
     )
     department = Column(
         String,
+        nullable=True
+    )
+    rating = Column(
+        Float,
+        nullable=True
+    )
+    review_count = Column(
+        Integer,
+        nullable=True
+    )
+    experience_years = Column(
+        Integer,
         nullable=True
     )
     token = Column(

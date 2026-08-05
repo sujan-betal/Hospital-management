@@ -15,6 +15,18 @@ class ReceptionistCreateRequest(BaseModel):
     password: str = Field(..., min_length=6)
 
 
+# ─────────────────────── Ward / Bed Management ───────────────────────
+
+class ReceptionistBedUpdateRequest(BaseModel):
+    """Front-desk bed action — book (occupy/reserve) or release a bed.
+
+    Receptionists are intentionally limited to the status and the patient
+    occupying the bed; ward, price, floor and equipment stay admin-managed.
+    """
+    status: str | None = Field(default=None, max_length=20)
+    patient: str | None = Field(default=None, max_length=100)
+
+
 # ─────────────────────── OPD Appointments ───────────────────────
 
 class AppointmentCreateRequest(BaseModel):

@@ -11,6 +11,7 @@ from src.modules.receptionist.receptionist_schema import (
     AppointmentUpdateRequest,
     InvoiceCreateRequest,
     InvoiceUpdateRequest,
+    ReceptionistBedUpdateRequest,
     ReceptionistCreateRequest,
 )
 from src.modules.receptionist.receptionist_service import (
@@ -24,12 +25,32 @@ from src.modules.receptionist.receptionist_service import (
     list_doctors_service,
     list_invoices_service,
     update_appointment_service,
+    update_bed_status_service,
     update_invoice_service,
 )
+from src.modules.hospital.hospital_service import list_beds_service
 
 router = APIRouter(prefix="/api/receptionist", tags=["Receptionist"])
 
 FRONT_DESK_ROLES = ["RECEPTIONIST", "ADMIN", "SUBADMIN"]
+
+
+@router.get("/beds")
+async def list_beds(
+    staff=Depends(authorization(allowed_roles=FRONT_DESK_ROLES)),
+    db: AsyncSession = Depends(get_db),
+):
+    return await list_beds_service(db)
+
+
+@router.put("/beds/{bed_id}")
+async def update_bed_status(
+    bed_id: str,
+    payload: ReceptionistBedUpdateRequest,
+    staff=Depends(authorization(allowed_roles=FRONT_DESK_ROLES)),
+    db: AsyncSession = Depends(get_db),
+):
+    return await update_bed_status_service(bed_id, payload, db)
 
 
 @router.post("/register")

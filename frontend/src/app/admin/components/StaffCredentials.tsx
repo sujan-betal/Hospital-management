@@ -27,15 +27,21 @@ import {
   UserCog,
   UserCheck,
   KeySquare,
+  CheckSquare,
+  Square,
 } from "lucide-react"
 import { StaffCredential } from "../mockData"
 import {
+  assignPermissions,
   createDoctor,
+  createReceptionist,
   createSubAdmin,
   deleteStaff,
+  listPermissions,
   listStaff,
   registerAdmin,
   updateStaff,
+  type PermissionGroup,
 } from "@/services/auth.service"
 
 interface StaffCredentialsProps {
@@ -70,6 +76,7 @@ function convertStaffRow(row: any): StaffCredential {
   return {
     id: `CRED-${row.user_id}`,
     user_id: row.user_id,
+    admin_id: row.admin_id ?? undefined,
     fullName:
       role === "doctor"
         ? String(row.user_name || "").startsWith("Dr.")
@@ -95,7 +102,87 @@ function convertStaffRow(row: any): StaffCredential {
         : "inactive",
     createdAt: row.created_at ? String(row.created_at).slice(0, 10) : new Date().toISOString().slice(0, 10),
     lastLogin: null,
+    permissions: Array.isArray(row.permissions) ? row.permissions : [],
   }
+}
+
+/* ─── Permission picker (checkbox grid of assignable options) ─── */
+function PermissionPicker({
+  groups,
+  selected,
+  onChange,
+}: {
+  groups: PermissionGroup[]
+  selected: string[]
+  onChange: (next: string[]) => void
+}) {
+  const isFullAccess = selected.includes("ALL")
+  const allKeys = groups.flatMap((g) => g.items.map((i) => i.key))
+
+  const toggle = (key: string) => {
+    if (key === "ALL") {
+      onChange(isFullAccess ? [] : ["ALL"])
+      return
+    }
+    const withoutAll = selected.filter((p) => p !== "ALL")
+    onChange(
+      withoutAll.includes(key)
+        ? withoutAll.filter((p) => p !== key)
+        : [...withoutAll, key]
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] text-[#8AA098] font-bold uppercase tracking-wider">
+          Choose access options
+        </p>
+        <button
+          type="button"
+          onClick={() => onChange(isFullAccess ? [] : allKeys)}
+          className="flex items-center gap-1.5 text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-2.5 py-1 hover:bg-teal-100 transition-all"
+        >
+          {isFullAccess ? <Square className="h-3 w-3" /> : <CheckSquare className="h-3 w-3" />}
+          {isFullAccess ? "Clear all" : "Select all"}
+        </button>
+      </div>
+
+      {groups.map((group) => (
+        <div key={group.group}>
+          <p className="text-[11px] font-bold text-[#12463E] mb-2">{group.group}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {group.items.map((opt) => {
+              const checked = selected.includes(opt.key)
+              return (
+                <label
+                  key={opt.key}
+                  className={`flex items-start gap-2.5 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                    checked
+                      ? "border-teal-400 bg-teal-50/70"
+                      : "border-[#E8ECEB] bg-white hover:border-[#D7E2DC]"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggle(opt.key)}
+                    className="mt-0.5 h-4 w-4 rounded border-[#D7E2DC] text-teal-600 focus:ring-teal-500/30 accent-teal-600"
+                  />
+                  <div>
+                    <p className={`text-xs font-bold ${checked ? "text-teal-800" : "text-[#0B2B26]"}`}>
+                      {opt.label}
+                    </p>
+                    <p className="text-[10px] text-[#8AA098] mt-0.5 leading-snug">{opt.description}</p>
+                  </div>
+                </label>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 /* ═══════════════════════════════════════════════════════════ */
@@ -111,6 +198,7 @@ export function StaffCredentials({
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [viewCredId, setViewCredId] = useState<string | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
+  const [permissionGroups, setPermissionGroups] = useState<PermissionGroup[]>([])
 
   // Create form state
   const [newFullName, setNewFullName] = useState("")
@@ -118,7 +206,7 @@ export function StaffCredentials({
   const [newEmail, setNewEmail] = useState("")
   const [newPhone, setNewPhone] = useState("")
   const [newDepartment, setNewDepartment] = useState("")
-  const [newPermissions, setNewPermissions] = useState("")
+  const [newPermissions, setNewPermissions] = useState<string[]>([])
   const [newUserName, setNewUserName] = useState("")
   const [generatedPassword, setGeneratedPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -134,6 +222,7 @@ export function StaffCredentials({
   const [editPhone, setEditPhone] = useState("")
   const [editDepartment, setEditDepartment] = useState("")
   const [editStatus, setEditStatus] = useState<StaffCredential["status"]>("active")
+  const [editPermissions, setEditPermissions] = useState<string[]>([])
   const [editError, setEditError] = useState("")
   const [editSaving, setEditSaving] = useState(false)
 
@@ -152,6 +241,22 @@ export function StaffCredentials({
         const rows = res.data
         if (Array.isArray(rows) && rows.length > 0) {
           setStaff(rows.map(convertStaffRow))
+        }
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [])
+
+  // Load the assignable-permission catalog for the sub-admin picker.
+  useEffect(() => {
+    let active = true
+    listPermissions()
+      .then((res) => {
+        if (!active) return
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          setPermissionGroups(res.data)
         }
       })
       .catch(() => {})
@@ -181,13 +286,23 @@ export function StaffCredentials({
 
   const dismissNotice = () => setNotice(null)
 
+  const permissionLabel = (key: string) => {
+    for (const g of permissionGroups) {
+      const item = g.items.find((i) => i.key === key)
+      if (item) return item.label
+    }
+    return key === "ALL"
+      ? "Full Access"
+      : key.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+  }
+
   const handleOpenCreate = () => {
     setNewFullName("")
     setNewRole("doctor")
     setNewEmail("")
     setNewPhone("")
     setNewDepartment("")
-    setNewPermissions("")
+    setNewPermissions([])
     setNewUserName("")
     setGeneratedPassword(generatePassword())
     setShowPassword(false)
@@ -219,6 +334,7 @@ export function StaffCredentials({
     try {
       const userName = newUserName || deriveUserName(newFullName)
       let createdUserId: string | undefined
+      let createdAdminId: number | undefined
 
       if (newRole === "doctor") {
         const res = await createDoctor({
@@ -229,15 +345,19 @@ export function StaffCredentials({
         })
         createdUserId = res.data?.user_id
       } else if (newRole === "subadmin") {
-        const permissions = newPermissions
-          .split(",")
-          .map((p) => p.trim().toUpperCase())
-          .filter(Boolean)
         const res = await createSubAdmin({
           user_name: userName,
           email: newEmail,
           password: generatedPassword,
-          permissions: permissions.length ? permissions : ["ALL"],
+          permissions: newPermissions,
+        })
+        createdUserId = res.data?.user_id
+        createdAdminId = res.data?.id
+      } else if (newRole === "receptionist") {
+        const res = await createReceptionist({
+          user_name: userName,
+          email: newEmail,
+          password: generatedPassword,
         })
         createdUserId = res.data?.user_id
       } else {
@@ -257,6 +377,7 @@ export function StaffCredentials({
       const newCred: StaffCredential = {
         id: `CRED-${createdUserId || Math.floor(100 + Math.random() * 900)}`,
         user_id: createdUserId,
+        admin_id: createdAdminId,
         fullName: newRole === "doctor" ? `Dr. ${newFullName}` : newFullName,
         role: newRole,
         email: newEmail,
@@ -272,6 +393,7 @@ export function StaffCredentials({
         status: "active",
         createdAt: dateStr,
         lastLogin: null,
+        permissions: newRole === "subadmin" ? newPermissions : undefined,
       }
 
       setStaff([newCred, ...staff])
@@ -283,10 +405,15 @@ export function StaffCredentials({
           type: "success",
           text: `Doctor account created. Password-set email sent to ${newEmail}.`,
         })
+      } else if (newRole === "receptionist") {
+        setNotice({
+          type: "success",
+          text: `Receptionist account created. Password-set email sent to ${newEmail}.`,
+        })
       } else {
         setNotice({
           type: "success",
-          text: `${newRole === "subadmin" ? "Sub-admin" : "Receptionist"} credential created successfully.`,
+          text: "Sub-admin credential created successfully.",
         })
       }
     } catch (err: any) {
@@ -321,6 +448,7 @@ export function StaffCredentials({
     setEditPhone(cred.phone === "—" ? "" : cred.phone)
     setEditDepartment(cred.department)
     setEditStatus(cred.status)
+    setEditPermissions(cred.permissions ?? [])
     setEditError("")
     setIsEditOpen(true)
   }
@@ -335,6 +463,11 @@ export function StaffCredentials({
       return
     }
 
+    if (editCred.role === "subadmin" && !editCred.admin_id) {
+      setEditError("This sub-admin is not linked to a backend account, so permissions cannot be saved.")
+      return
+    }
+
     setEditSaving(true)
     try {
       await updateStaff(editCred.user_id, {
@@ -345,6 +478,13 @@ export function StaffCredentials({
         status: editStatus.toUpperCase(),
       })
 
+      if (editCred.role === "subadmin" && editCred.admin_id) {
+        await assignPermissions({
+          admin_id: editCred.admin_id,
+          permissions: editPermissions,
+        })
+      }
+
       const updated: StaffCredential = {
         ...editCred,
         fullName: editCred.role === "doctor" ? `Dr. ${editFullName}` : editFullName,
@@ -352,6 +492,7 @@ export function StaffCredentials({
         phone: editPhone || "—",
         department: editDepartment,
         status: editStatus,
+        permissions: editCred.role === "subadmin" ? editPermissions : undefined,
       }
       setStaff(staff.map((c) => (c.id === editCred.id ? updated : c)))
       onUpdateCredential(updated)
@@ -724,6 +865,38 @@ export function StaffCredentials({
                       </span>
                     </div>
                   </div>
+
+                  {cred.role === "subadmin" && (
+                    <div className="mt-4 border-t border-[#E8ECEB] pt-4">
+                      <span className="text-[10px] text-[#8AA098] font-bold uppercase tracking-wider block mb-2">
+                        Assigned Permissions
+                      </span>
+                      {cred.permissions && cred.permissions.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {cred.permissions.includes("ALL") ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold text-teal-800 bg-teal-50 border border-teal-200">
+                              <Shield className="h-3 w-3" />
+                              Full Access
+                            </span>
+                          ) : (
+                            cred.permissions.map((p) => (
+                              <span
+                                key={p}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold text-[#12463E] bg-[#EEF4F1] border border-[#D7E2DC]"
+                              >
+                                <CheckSquare className="h-3 w-3" />
+                                {permissionLabel(p)}
+                              </span>
+                            ))
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-[#8AA098] font-medium">
+                          No module permissions assigned.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -915,7 +1088,7 @@ export function StaffCredentials({
               </div>
 
               {/* Role-specific auth setup */}
-              {newRole === "doctor" ? (
+              {newRole === "doctor" || newRole === "receptionist" ? (
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-[#12463E] flex items-center gap-1.5">
                     <Mail className="h-3.5 w-3.5 text-emerald-600" />
@@ -924,33 +1097,38 @@ export function StaffCredentials({
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 px-4 py-3.5">
                     <p className="text-[11px] text-[#3E6B5C] leading-relaxed">
                       A secure password-set link will be emailed to{" "}
-                      <span className="font-bold text-emerald-800">{newEmail || "this doctor"}</span>.
-                      The doctor uses the link to create their own password, then signs in to the
-                      Doctor Portal. Only this doctor&apos;s account will have access.
+                      <span className="font-bold text-emerald-800">{newEmail || `this ${newRole}`}</span>.
+                      The {newRole === "doctor" ? "doctor" : "receptionist"} uses the link to create their own
+                      password, then signs in to the {newRole === "doctor" ? "Doctor" : "Receptionist"} Portal.
+                      Only this {newRole === "doctor" ? "doctor" : "receptionist"}&apos;s account will have access.
                     </p>
                   </div>
                 </div>
               ) : newRole === "subadmin" ? (
-                <div className="space-y-1.5">
+                <div className="space-y-3">
                   <label className="text-xs font-bold text-[#12463E] flex items-center gap-1.5">
                     <KeySquare className="h-3.5 w-3.5 text-teal-600" />
                     Permissions
                   </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. ALL  (or comma-separated: DOCTOR_MANAGE, PATIENT_VIEW)"
-                    value={newPermissions}
-                    onChange={(e) => setNewPermissions(e.target.value)}
-                    className="w-full h-11 px-3.5 rounded-xl border border-[#D7E2DC] bg-[#F6F8F7] text-xs text-[#0B2B26] focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
-                  />
+                  {permissionGroups.length > 0 ? (
+                    <PermissionPicker
+                      groups={permissionGroups}
+                      selected={newPermissions}
+                      onChange={setNewPermissions}
+                    />
+                  ) : (
+                    <p className="text-[11px] text-[#8AA098] rounded-xl border border-[#E8ECEB] bg-[#F6F8F7] px-4 py-3">
+                      Loading available permissions...
+                    </p>
+                  )}
                   <p className="text-[10px] text-[#8AA098]">
-                    Leave blank to grant ALL permissions. The sub-admin logs in with the password below.
+                    Select the modules this sub-admin can access. Leave empty to create an account with no module access.
                   </p>
                 </div>
               ) : null}
 
-              {/* Generated password (sub-admin & receptionist) */}
-              {newRole !== "doctor" && (
+              {/* Generated password (sub-admin) */}
+              {newRole === "subadmin" && (
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-[#12463E] flex items-center gap-1.5">
                     <KeyRound className="h-3.5 w-3.5 text-emerald-600" />
@@ -1123,6 +1301,28 @@ export function StaffCredentials({
                       <option key={dept} value={dept}>{dept}</option>
                     ))}
                   </select>
+                </div>
+              )}
+
+              {editCred.role === "subadmin" && (
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-[#12463E] flex items-center gap-1.5">
+                    <KeySquare className="h-3.5 w-3.5 text-teal-600" />
+                    Permissions
+                  </label>
+                  {editCred.admin_id && permissionGroups.length > 0 ? (
+                    <PermissionPicker
+                      groups={permissionGroups}
+                      selected={editPermissions}
+                      onChange={setEditPermissions}
+                    />
+                  ) : (
+                    <p className="text-[11px] text-[#8AA098] rounded-xl border border-[#E8ECEB] bg-[#F6F8F7] px-4 py-3">
+                      {permissionGroups.length > 0
+                        ? "Permissions can be managed once this account is saved to the database."
+                        : "Loading available permissions..."}
+                    </p>
+                  )}
                 </div>
               )}
 
