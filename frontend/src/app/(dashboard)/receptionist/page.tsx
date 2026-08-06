@@ -83,11 +83,11 @@ const mockPatients: Patient[] = [
 ]
 
 const mockAppointments: Appointment[] = [
-  { id: "APT-901", patientName: "Robert Downey Jr.", doctorName: "Dr. Gregory House", specialty: "General Medicine", date: "2026-07-20", time: "09:30 AM", status: "checked-in" },
-  { id: "APT-902", patientName: "Emma Watson", doctorName: "Dr. Gregory House", specialty: "General Medicine", date: "2026-07-20", time: "10:15 AM", status: "checked-in" },
-  { id: "APT-903", patientName: "Liam Neeson", doctorName: "Dr. Stephen Strange", specialty: "Cardiology", date: "2026-07-20", time: "11:00 AM", status: "scheduled" },
-  { id: "APT-904", patientName: "Scarlett Johansson", doctorName: "Dr. Allison Cameron", specialty: "Pediatrics", date: "2026-07-20", time: "11:45 AM", status: "scheduled" },
-  { id: "APT-905", patientName: "Leonardo DiCaprio", doctorName: "Dr. Meredith Grey", specialty: "Neurology", date: "2026-07-21", time: "02:15 PM", status: "scheduled" },
+  { id: "APT-901", patientName: "Robert Downey Jr.", patientPhone: "+1 (555) 300-3000", doctorName: "Dr. Gregory House", specialty: "General Medicine", date: "2026-07-20", time: "09:30 AM", fee: 150, paymentStatus: "paid", status: "checked-in" },
+  { id: "APT-902", patientName: "Emma Watson", patientPhone: "+1 (555) 019-2834", doctorName: "Dr. Gregory House", specialty: "General Medicine", date: "2026-07-20", time: "10:15 AM", fee: 150, paymentStatus: "unpaid", status: "checked-in" },
+  { id: "APT-903", patientName: "Liam Neeson", patientPhone: "+44 7911 123456", doctorName: "Dr. Stephen Strange", specialty: "Cardiology", date: "2026-07-20", time: "11:00 AM", fee: 200, paymentStatus: "unpaid", status: "scheduled" },
+  { id: "APT-904", patientName: "Scarlett Johansson", patientPhone: "+1 (555) 102-8822", doctorName: "Dr. Allison Cameron", specialty: "Pediatrics", date: "2026-07-20", time: "11:45 AM", fee: 150, paymentStatus: "unpaid", status: "scheduled" },
+  { id: "APT-905", patientName: "Leonardo DiCaprio", patientPhone: "+1 (555) 987-6543", doctorName: "Dr. Meredith Grey", specialty: "Neurology", date: "2026-07-21", time: "02:15 PM", fee: 250, paymentStatus: "unpaid", status: "scheduled" },
 ]
 
 const mockInvoices: Invoice[] = [
