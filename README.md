@@ -103,8 +103,6 @@ Create a `.env` file in both `frontend/` and `backend/` — see `.env.example` (
 
 
 ## Contributors
-
-- [Sujan-Codenet](https://github.com/sujan-codenet)
 - [sujan-betal](https://github.com/sujan-betal)
 
 ## License
