@@ -9,3 +9,9 @@ build/
 
 __pycache__/
 .venv/
+
+# dev log / build artifacts
+frontend/dev_err.txt
+frontend/dev_out.txt
+frontend/tsconfig.tsbuildinfo
+*.tsbuildinfo

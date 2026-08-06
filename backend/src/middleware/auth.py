@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 ALGORITHM = os.getenv("JWT_ALGORITHM")
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 ROLE_MODEL_MAP = {
     "ADMIN": Admin,
@@ -50,10 +50,16 @@ def authorization(allowed_roles: list = None, required_permissions: list = None)
     required_permissions = required_permissions or []
 
     async def authorize_user(
-        credentials: HTTPAuthorizationCredentials = Depends(security),
+        credentials: HTTPAuthorizationCredentials | None = Depends(security),
         db: AsyncSession = Depends(get_db),
     ):
         try:
+            if credentials is None:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Not authenticated",
+                )
+
             token = credentials.credentials
 
             if not SECRET_KEY or not ALGORITHM:
