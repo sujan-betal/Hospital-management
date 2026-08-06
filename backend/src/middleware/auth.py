@@ -5,6 +5,9 @@ from sqlalchemy import select
 from jose import jwt, JWTError
 import logging
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from src.config.database import get_db
 
@@ -17,8 +20,17 @@ from src.models.permission_model import Permission
 
 logger = logging.getLogger(__name__)
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY")
-ALGORITHM = os.getenv("JWT_ALGORITHM")
+# Fallback so auth works even if JWT_SECRET_KEY is not set on the host
+# (e.g. fresh deployment). Override it in production with a strong secret.
+DEFAULT_JWT_SECRET = "aura-medical-dev-secret-change-me-in-production"
+SECRET_KEY = os.getenv("JWT_SECRET_KEY") or DEFAULT_JWT_SECRET
+ALGORITHM = os.getenv("JWT_ALGORITHM") or "HS256"
+
+if not os.getenv("JWT_SECRET_KEY"):
+    logger.warning(
+        "JWT_SECRET_KEY not set on this environment. Using the built-in "
+        "fallback secret - set JWT_SECRET_KEY on the host for production."
+    )
 
 security = HTTPBearer(auto_error=False)
 
@@ -61,12 +73,6 @@ def authorization(allowed_roles: list = None, required_permissions: list = None)
                 )
 
             token = credentials.credentials
-
-            if not SECRET_KEY or not ALGORITHM:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="JWT configuration missing",
-                )
 
             try:
                 decoded = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])

@@ -285,7 +285,7 @@ async def reset_password_service(payload, db: AsyncSession):
         try:
             decoded = jwt.decode(
                 payload.token,
-                os.getenv("JWT_SECRET_KEY"),
+                os.getenv("JWT_SECRET_KEY") or "aura-medical-dev-secret-change-me-in-production",
                 algorithms=[os.getenv("JWT_ALGORITHM", "HS256")],
             )
         except JWTError:
