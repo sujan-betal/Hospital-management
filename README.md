@@ -100,9 +100,7 @@ npm run dev
 
 Create a `.env` file in both `frontend/` and `backend/` — see `.env.example` (if provided) for required keys such as `DATABASE_URL`, `NEXT_PUBLIC_API_URL`, etc.
 
-## Live Demo
 
-🔗 [View Production](https://hospital-management-hzeh5wvbn-sujan-betals-projects.vercel.app)
 
 ## Contributors
 
