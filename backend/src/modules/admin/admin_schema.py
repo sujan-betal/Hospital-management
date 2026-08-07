@@ -15,7 +15,7 @@ class SubAdminCreateRequest(BaseModel):
     email: EmailStr
     # Optional for API compatibility — sub-admins set their password via the
     # emailed reset link (the provided value is ignored).
-    password: str | None = Field(default=None, min_length=6)
+    # password: str | None = Field(default=None, min_length=6)
     permissions: list[str] = Field(default_factory=list)
 
 class PermissionAssignRequest(BaseModel):
