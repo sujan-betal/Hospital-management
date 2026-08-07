@@ -12,8 +12,6 @@ from pydantic import BaseModel, EmailStr, Field
 class ReceptionistCreateRequest(BaseModel):
     user_name: str = Field(..., min_length=3, max_length=50)
     email: EmailStr
-    # Optional for API compatibility — receptionists set their password via the
-    # emailed reset link (the provided value is ignored).
     password: str | None = Field(default=None, min_length=6)
 
 
