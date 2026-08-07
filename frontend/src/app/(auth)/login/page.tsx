@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import Link from "next/link"
 import {
   Activity,
   Smartphone,
@@ -360,43 +359,7 @@ export default function LoginPage() {
           </div>
 
           {/* Bottom links */}
-          <div className="mt-6 space-y-4">
-            <div className="border-t border-[#EEF4F1] pt-4">
-              <p className="text-center text-[11px] font-bold text-[#8AA098] uppercase tracking-wider mb-2.5">
-                Quick Demo Access Portals
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <Link
-                  href="/patient"
-                  className="flex items-center justify-center gap-2 text-xs text-emerald-800 font-bold bg-emerald-50/50 hover:bg-emerald-100/80 px-3 py-2 rounded-xl transition-all border border-emerald-100 hover:border-emerald-200 shadow-xs"
-                >
-                  <Smartphone className="h-3.5 w-3.5" />
-                  Patient Panel
-                </Link>
-                <Link
-                  href="/doctor"
-                  className="flex items-center justify-center gap-2 text-xs text-emerald-800 font-bold bg-emerald-50/50 hover:bg-emerald-100/80 px-3 py-2 rounded-xl transition-all border border-emerald-100 hover:border-emerald-200 shadow-xs"
-                >
-                  <Stethoscope className="h-3.5 w-3.5" />
-                  Doctor Panel
-                </Link>
-                <Link
-                  href="/receptionist"
-                  className="flex items-center justify-center gap-2 text-xs text-emerald-800 font-bold bg-emerald-50/50 hover:bg-emerald-100/80 px-3 py-2 rounded-xl transition-all border border-emerald-100 hover:border-emerald-200 shadow-xs"
-                >
-                  <ShieldCheck className="h-3.5 w-3.5" />
-                  Receptionist
-                </Link>
-                <Link
-                  href="/admin"
-                  className="flex items-center justify-center gap-2 text-xs text-white font-bold bg-[#12463E] hover:bg-[#0B2B26] px-3 py-2 rounded-xl transition-all border border-[#1E5D52] shadow-xs"
-                >
-                  <Activity className="h-3.5 w-3.5" />
-                  Admin Console
-                </Link>
-              </div>
-            </div>
-
+          <div className="mt-6">
             <p className="text-center text-[10px] text-[#8AA098] flex items-center justify-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               Protected by end-to-end encryption · HIPAA Compliant
