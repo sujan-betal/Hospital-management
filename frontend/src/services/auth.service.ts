@@ -21,14 +21,14 @@ export interface CreateDoctorPayload {
 export interface CreateSubAdminPayload {
   user_name: string
   email: string
-  password: string
+  password?: string
   permissions: string[]
 }
 
 export interface CreateReceptionistPayload {
   user_name: string
   email: string
-  password: string
+  password?: string
 }
 
 export interface AssignPermissionsPayload {

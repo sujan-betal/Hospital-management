@@ -13,8 +13,10 @@ logger = logging.getLogger(__name__)
 
 SMTP_HOST = os.getenv("SMTP_HOST")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+SMTP_USER = (os.getenv("SMTP_USER") or "").strip()
+# Gmail app passwords are 16 alphanumeric chars with no spaces; strip any
+# whitespace so credentials pasted with formatting still authenticate.
+SMTP_PASSWORD = "".join((os.getenv("SMTP_PASSWORD") or "").split())
 # Prefer explicit sender config; fall back to the SMTP account itself.
 MAIL_FROM = os.getenv("MAIL_FROM") or os.getenv("FROM_EMAIL") or SMTP_USER
 MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "AURA Medical")

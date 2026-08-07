@@ -12,10 +12,6 @@ import {
   BadgeCheck,
   Shield,
   ShieldOff,
-  Eye,
-  EyeOff,
-  Copy,
-  Check,
   KeyRound,
   UserPlus,
   Clock,
@@ -208,9 +204,6 @@ export function StaffCredentials({
   const [newDepartment, setNewDepartment] = useState("")
   const [newPermissions, setNewPermissions] = useState<string[]>([])
   const [newUserName, setNewUserName] = useState("")
-  const [generatedPassword, setGeneratedPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [copied, setCopied] = useState(false)
   const [createError, setCreateError] = useState("")
   const [creating, setCreating] = useState(false)
 
@@ -304,9 +297,6 @@ export function StaffCredentials({
     setNewDepartment("")
     setNewPermissions([])
     setNewUserName("")
-    setGeneratedPassword(generatePassword())
-    setShowPassword(false)
-    setCopied(false)
     setCreateError("")
     setIsCreateOpen(true)
   }
@@ -317,12 +307,6 @@ export function StaffCredentials({
   const handleFullNameChange = (value: string) => {
     setNewFullName(value)
     setNewUserName(deriveUserName(value))
-  }
-
-  const handleCopyPassword = () => {
-    navigator.clipboard.writeText(generatedPassword)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
   }
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -348,7 +332,6 @@ export function StaffCredentials({
         const res = await createSubAdmin({
           user_name: userName,
           email: newEmail,
-          password: generatedPassword,
           permissions: newPermissions,
         })
         createdUserId = res.data?.user_id
@@ -357,14 +340,13 @@ export function StaffCredentials({
         const res = await createReceptionist({
           user_name: userName,
           email: newEmail,
-          password: generatedPassword,
         })
         createdUserId = res.data?.user_id
       } else {
         const res = await registerAdmin({
           user_name: userName,
           email: newEmail,
-          password: generatedPassword,
+          password: generatePassword(),
         })
         createdUserId = res.data?.user_id
       }
@@ -410,10 +392,15 @@ export function StaffCredentials({
           type: "success",
           text: `Receptionist account created. Password-set email sent to ${newEmail}.`,
         })
+      } else if (newRole === "subadmin") {
+        setNotice({
+          type: "success",
+          text: `Sub-admin account created. Password-set email sent to ${newEmail}.`,
+        })
       } else {
         setNotice({
           type: "success",
-          text: "Sub-admin credential created successfully.",
+          text: "Admin credential created successfully.",
         })
       }
     } catch (err: any) {
@@ -1088,93 +1075,48 @@ export function StaffCredentials({
               </div>
 
               {/* Role-specific auth setup */}
-              {newRole === "doctor" || newRole === "receptionist" ? (
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#12463E] flex items-center gap-1.5">
-                    <Mail className="h-3.5 w-3.5 text-emerald-600" />
-                    Password Set-Up (Email Invite)
-                  </label>
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 px-4 py-3.5">
-                    <p className="text-[11px] text-[#3E6B5C] leading-relaxed">
-                      A secure password-set link will be emailed to{" "}
-                      <span className="font-bold text-emerald-800">{newEmail || `this ${newRole}`}</span>.
-                      The {newRole === "doctor" ? "doctor" : "receptionist"} uses the link to create their own
-                      password, then signs in to the {newRole === "doctor" ? "Doctor" : "Receptionist"} Portal.
-                      Only this {newRole === "doctor" ? "doctor" : "receptionist"}&apos;s account will have access.
-                    </p>
-                  </div>
-                </div>
-              ) : newRole === "subadmin" ? (
+              {newRole === "doctor" || newRole === "receptionist" || newRole === "subadmin" ? (
                 <div className="space-y-3">
-                  <label className="text-xs font-bold text-[#12463E] flex items-center gap-1.5">
-                    <KeySquare className="h-3.5 w-3.5 text-teal-600" />
-                    Permissions
-                  </label>
-                  {permissionGroups.length > 0 ? (
-                    <PermissionPicker
-                      groups={permissionGroups}
-                      selected={newPermissions}
-                      onChange={setNewPermissions}
-                    />
-                  ) : (
-                    <p className="text-[11px] text-[#8AA098] rounded-xl border border-[#E8ECEB] bg-[#F6F8F7] px-4 py-3">
-                      Loading available permissions...
-                    </p>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-[#12463E] flex items-center gap-1.5">
+                      <Mail className="h-3.5 w-3.5 text-emerald-600" />
+                      Password Set-Up (Email Invite)
+                    </label>
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 px-4 py-3.5">
+                      <p className="text-[11px] text-[#3E6B5C] leading-relaxed">
+                        A secure password-set link will be emailed to{" "}
+                        <span className="font-bold text-emerald-800">{newEmail || `this ${newRole}`}</span>.
+                        The {newRole === "doctor" ? "doctor" : newRole === "receptionist" ? "receptionist" : "sub-admin"} uses the link to create their own
+                        password, then signs in to the {newRole === "doctor" ? "Doctor" : newRole === "receptionist" ? "Receptionist" : "Admin"} Portal.
+                        Only this {newRole === "doctor" ? "doctor" : newRole === "receptionist" ? "receptionist" : "sub-admin"}&apos;s account will have access.
+                      </p>
+                    </div>
+                  </div>
+
+                  {newRole === "subadmin" && (
+                    <div className="space-y-3">
+                      <label className="text-xs font-bold text-[#12463E] flex items-center gap-1.5">
+                        <KeySquare className="h-3.5 w-3.5 text-teal-600" />
+                        Permissions
+                      </label>
+                      {permissionGroups.length > 0 ? (
+                        <PermissionPicker
+                          groups={permissionGroups}
+                          selected={newPermissions}
+                          onChange={setNewPermissions}
+                        />
+                      ) : (
+                        <p className="text-[11px] text-[#8AA098] rounded-xl border border-[#E8ECEB] bg-[#F6F8F7] px-4 py-3">
+                          Loading available permissions...
+                        </p>
+                      )}
+                      <p className="text-[10px] text-[#8AA098]">
+                        Select the modules this sub-admin can access. Leave empty to create an account with no module access.
+                      </p>
+                    </div>
                   )}
-                  <p className="text-[10px] text-[#8AA098]">
-                    Select the modules this sub-admin can access. Leave empty to create an account with no module access.
-                  </p>
                 </div>
               ) : null}
-
-              {/* Generated password (sub-admin) */}
-              {newRole === "subadmin" && (
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-[#12463E] flex items-center gap-1.5">
-                    <KeyRound className="h-3.5 w-3.5 text-emerald-600" />
-                    Auto-Generated Password
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 relative">
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        value={generatedPassword}
-                        readOnly
-                        className="w-full h-11 px-3.5 pr-10 rounded-xl border border-emerald-200 bg-emerald-50/50 text-sm font-mono text-[#0B2B26] focus:outline-none tracking-wider"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8AA098] hover:text-[#12463E] transition-colors"
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleCopyPassword}
-                      className={`h-11 px-4 rounded-xl border font-bold text-xs transition-all flex items-center gap-1.5 ${
-                        copied
-                          ? "bg-emerald-600 text-white border-emerald-600"
-                          : "bg-[#F6F8F7] text-[#12463E] border-[#D7E2DC] hover:bg-[#EEF4F1]"
-                      }`}
-                    >
-                      {copied ? <><Check className="h-3.5 w-3.5" /> Copied!</> : <><Copy className="h-3.5 w-3.5" /> Copy</>}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setGeneratedPassword(generatePassword())}
-                      className="h-11 px-4 rounded-xl border border-[#D7E2DC] bg-[#F6F8F7] text-[#12463E] font-bold text-xs hover:bg-[#EEF4F1] transition-all"
-                    >
-                      Regenerate
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-[#8AA098] flex items-center gap-1.5 mt-1">
-                    <Shield className="h-3 w-3" />
-                    Share this password securely with the staff member.
-                  </p>
-                </div>
-              )}
 
               {/* Action Buttons */}
               <div className="flex gap-3 border-t border-[#E8ECEB] pt-4 mt-2">

@@ -1,10 +1,13 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, or_
+import os
+from datetime import timedelta
 from src.models.admin_model import Admin
 from src.models.doctor_model import Doctor
 from src.models.receptionist_model import Receptionist
 from src.models.permission_model import Permission
 from src.utils.security import verify_password, get_password_hash, create_access_token
+from src.utils.email import send_password_reset_email
 from src.utils.common_schema import api_response_success, api_response_error
 from src.utils.status_code import StatusCode
 from src.modules.admin.admin_schema import AdminRegisterRequest, AdminLoginRequest
@@ -16,6 +19,9 @@ from src.modules.admin.permissions_catalog import (
 from src.modules.doctor.doctor_service import format_doctor_bank_data
 
 VALID_STATUSES = {"ACTIVE", "SUSPENDED", "INACTIVE"}
+
+RESET_TOKEN_EXPIRE_MINUTES = int(os.getenv("RESET_TOKEN_EXPIRE_MINUTES", "30"))
+FRONTEND_URI = os.getenv("FRONTEND_URI", "http://localhost:3000")
 
 SHIFT_STATUS_MAP = {
     "ACTIVE": "On Duty",
@@ -71,6 +77,18 @@ def _staff_to_dict(account, permissions: list[str] | None = None):
         data["permissions"] = []
 
     return data
+
+
+def _build_reset_link(token: str) -> str:
+    return f"{FRONTEND_URI}/reset-password?token={token}"
+
+
+def _create_reset_token(user_id, role: str) -> str:
+    return create_access_token(
+        subject=user_id,
+        role=role,
+        expires_delta=timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES),
+    )
 
 
 async def _get_staff_by_user_id(db: AsyncSession, user_id):
@@ -323,6 +341,11 @@ async def login_staff_service(
                     message=f"Account status is {admin.status}",
                     status_code=StatusCode.forbidden
                 )
+            if admin.is_reset:
+                return api_response_error(
+                    message="Please set your password using the link sent to your email.",
+                    status_code=StatusCode.forbidden
+                )
             if not verify_password(payload.password, admin.password):
                 return api_response_error(
                     message="Invalid email or password",
@@ -477,9 +500,10 @@ async def create_subadmin_service(
         new_subadmin = Admin(
             user_name=payload.user_name,
             email=payload.email,
-            password=get_password_hash(payload.password),
+            password=get_password_hash(os.urandom(24).hex()),
             role="SUBADMIN",
             status="ACTIVE",
+            is_reset=True,
             created_by=created_by,
         )
         db.add(new_subadmin)
@@ -492,12 +516,38 @@ async def create_subadmin_service(
         await db.commit()
         await db.refresh(new_subadmin)
 
+        # user_id is only assigned after commit, so build the reset token now
+        # to avoid embedding "None" as the UUID in the emailed link.
+        reset_token = _create_reset_token(new_subadmin.user_id, "SUBADMIN")
+        new_subadmin.token = reset_token
+        await db.commit()
+        await db.refresh(new_subadmin)
+
+        reset_link = _build_reset_link(reset_token)
+        delivered = send_password_reset_email(
+            to_email=new_subadmin.email,
+            full_name=new_subadmin.user_name,
+            reset_link=reset_link,
+            reset_minutes=RESET_TOKEN_EXPIRE_MINUTES,
+            login_email=new_subadmin.email,
+            login_username=new_subadmin.user_name,
+        )
+
         admin_data = format_admin_data(new_subadmin)
         admin_data["permissions"] = permissions
 
+        message = (
+            "Sub-admin created successfully with assigned permissions. A password-set "
+            f"email has been sent to {new_subadmin.email}."
+            if delivered
+            else "Sub-admin created successfully with assigned permissions, but the "
+                 "password-set email could not be sent to the sub-admin. "
+                 "Check the backend SMTP/console logs."
+        )
+
         return api_response_success(
             data=admin_data,
-            message="Sub-admin created successfully with assigned permissions",
+            message=message,
             status_code=StatusCode.create
         )
 
