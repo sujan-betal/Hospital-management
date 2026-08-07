@@ -1,4 +1,5 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+// Same-origin calls: Next.js rewrites /api/* to the backend (see next.config.ts).
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || ""
 
 export class ApiError extends Error {
   status: number

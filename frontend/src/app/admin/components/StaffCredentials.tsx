@@ -39,6 +39,7 @@ import {
   updateStaff,
   type PermissionGroup,
 } from "@/services/auth.service"
+import { useToast } from "@/components/ui/toast"
 
 interface StaffCredentialsProps {
   credentials: StaffCredential[]
@@ -46,8 +47,6 @@ interface StaffCredentialsProps {
   onUpdateCredential: (cred: StaffCredential) => void
   onDeleteCredential?: (id: string) => void
 }
-
-type Notice = { type: "success" | "error"; text: string }
 
 /* ─── Password generator ────────────────────────────────── */
 function generatePassword(): string {
@@ -193,7 +192,7 @@ export function StaffCredentials({
   const [roleFilter, setRoleFilter] = useState("all")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [viewCredId, setViewCredId] = useState<string | null>(null)
-  const [notice, setNotice] = useState<Notice | null>(null)
+  const toast = useToast()
   const [permissionGroups, setPermissionGroups] = useState<PermissionGroup[]>([])
 
   // Create form state
@@ -276,8 +275,6 @@ export function StaffCredentials({
 
     return matchesSearch && matchesRole
   })
-
-  const dismissNotice = () => setNotice(null)
 
   const permissionLabel = (key: string) => {
     for (const g of permissionGroups) {
@@ -383,25 +380,22 @@ export function StaffCredentials({
       setIsCreateOpen(false)
 
       if (newRole === "doctor") {
-        setNotice({
-          type: "success",
-          text: `Doctor account created. Password-set email sent to ${newEmail}.`,
-        })
+        toast.success(
+          "Doctor account created",
+          `Password-set email sent to ${newEmail}.`
+        )
       } else if (newRole === "receptionist") {
-        setNotice({
-          type: "success",
-          text: `Receptionist account created. Password-set email sent to ${newEmail}.`,
-        })
+        toast.success(
+          "Receptionist account created",
+          `Password-set email sent to ${newEmail}.`
+        )
       } else if (newRole === "subadmin") {
-        setNotice({
-          type: "success",
-          text: `Sub-admin account created. Password-set email sent to ${newEmail}.`,
-        })
+        toast.success(
+          "Sub-admin account created",
+          `Password-set email sent to ${newEmail}.`
+        )
       } else {
-        setNotice({
-          type: "success",
-          text: "Admin credential created successfully.",
-        })
+        toast.success("Admin credential created successfully.")
       }
     } catch (err: any) {
       setCreateError(err.message || "Failed to create credential")
@@ -418,7 +412,7 @@ export function StaffCredentials({
       try {
         await updateStaff(cred.user_id, { status: nextStatus.toUpperCase() })
       } catch (err: any) {
-        setNotice({ type: "error", text: err.message || "Failed to update status" })
+        toast.error("Failed to update status", err.message || "")
         return
       }
     }
@@ -484,7 +478,7 @@ export function StaffCredentials({
       setStaff(staff.map((c) => (c.id === editCred.id ? updated : c)))
       onUpdateCredential(updated)
       setIsEditOpen(false)
-      setNotice({ type: "success", text: "Credential updated successfully." })
+      toast.success("Credential updated successfully.")
     } catch (err: any) {
       setEditError(err.message || "Failed to update credential")
     } finally {
@@ -513,10 +507,10 @@ export function StaffCredentials({
       setStaff(staff.filter((c) => c.id !== deletingCred.id))
       onDeleteCredential?.(deletingCred.id)
       setIsDeleteOpen(false)
-      setNotice({
-        type: "success",
-        text: `${deletingCred.fullName} (${deletingCred.role}) has been permanently deleted.`,
-      })
+      toast.success(
+        "Credential deleted",
+        `${deletingCred.fullName} (${deletingCred.role}) has been permanently deleted.`
+      )
     } catch (err: any) {
       setDeleteError(err.message || "Failed to delete credential")
     } finally {
@@ -693,27 +687,6 @@ export function StaffCredentials({
           </button>
         </div>
       </div>
-
-      {/* ─── Notice ───────────────────────────────────── */}
-      {notice && (
-        <div
-          className={`flex items-center gap-3 border text-xs font-medium rounded-2xl px-4 py-3 ${
-            notice.type === "success"
-              ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-              : "bg-red-50 border-red-200 text-red-700"
-          }`}
-        >
-          <Mail className={`h-4 w-4 shrink-0 ${notice.type === "success" ? "text-emerald-600" : "text-red-600"}`} />
-          <span className="flex-1">{notice.text}</span>
-          <button
-            onClick={dismissNotice}
-            className="w-6 h-6 rounded-full bg-white/70 hover:bg-white flex items-center justify-center transition-all"
-            aria-label="Dismiss"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
 
       {/* ─── Credentials Table ────────────────────────── */}
       <div className="bg-white rounded-3xl border border-[#E8ECEB] shadow-xs overflow-x-auto">

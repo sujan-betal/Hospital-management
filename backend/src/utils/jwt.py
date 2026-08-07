@@ -12,8 +12,17 @@ from sqlalchemy.orm import Session
 load_dotenv()
 
 DEFAULT_JWT_SECRET = "aura-medical-dev-secret-change-me-in-production"
-SECRET_KEY = os.getenv("JWT_SECRET_KEY") or DEFAULT_JWT_SECRET
-ALGORITHM  = os.getenv("JWT_ALGORITHM", "HS256")
+ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+
+# Fail fast in production: never fall back to the known default secret.
+if os.getenv("APP_ENV", "development") == "production":
+    SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+    if not SECRET_KEY or SECRET_KEY == DEFAULT_JWT_SECRET:
+        raise RuntimeError(
+            "JWT_SECRET_KEY must be set to a strong, unique value in production"
+        )
+else:
+    SECRET_KEY = os.getenv("JWT_SECRET_KEY") or DEFAULT_JWT_SECRET
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS   = 30

@@ -37,6 +37,7 @@ import {
   type DoctorOption,
   type DashboardStats,
 } from "@/services/receptionist.service"
+import { useToast } from "@/components/ui/toast"
 
 // Types & Mock Data for Receptionist Panel
 interface Patient {
@@ -119,6 +120,7 @@ const mockDashboard: DashboardStats = {
 }
 
 export default function ReceptionistDashboard() {
+  const toast = useToast()
   const [activeTab, setActiveTab] = useState<"registration" | "appointments" | "beds" | "billing" | "reports">("registration")
   const [currentTime, setCurrentTime] = useState("")
   const [authed, setAuthed] = useState(false)
@@ -280,8 +282,9 @@ export default function ReceptionistDashboard() {
       setPatients([created, ...patients])
       setNewPatient({ name: "", age: "", gender: "Male", phone: "", email: "", insuranceProvider: "" })
       setIsRegisterOpen(false)
+      toast.success("Patient registered", `${created.name} was added to the system.`)
     } catch (err: any) {
-      alert(err.message || "Failed to register patient")
+      toast.error("Failed to register patient", err.message || "")
     }
   }
 
@@ -317,8 +320,9 @@ export default function ReceptionistDashboard() {
       setAppointments([created, ...appointments])
       setNewAppt({ patientName: "", doctorName: "", specialty: "General Medicine", time: "", date: "" })
       setIsBookOpen(false)
+      toast.success("Appointment booked", `${created.patientName} scheduled with ${created.doctorName} at ${created.time}.`)
     } catch (err: any) {
-      alert(err.message || "Failed to book appointment")
+      toast.error("Failed to book appointment", err.message || "")
     }
   }
 
@@ -364,8 +368,9 @@ export default function ReceptionistDashboard() {
       setInvoices([created, ...invoices])
       setNewInvoice({ patientName: "", insuranceStatus: "uninsured", items: [{ description: "", cost: 0 }] })
       setIsInvoiceOpen(false)
+      toast.success("Invoice created", `Invoice ${created.id} for ${created.patientName} recorded.`)
     } catch (err: any) {
-      alert(err.message || "Failed to create invoice")
+      toast.error("Failed to create invoice", err.message || "")
     }
   }
 
@@ -373,8 +378,9 @@ export default function ReceptionistDashboard() {
     try {
       await updateInvoice(id, { payment_status: "PAID" })
       setInvoices(invoices.map(inv => inv.id === id ? { ...inv, paymentStatus: "paid" as const } : inv))
+      toast.success("Invoice marked as paid", `Invoice ${id} settled.`)
     } catch (err: any) {
-      alert(err.message || "Failed to mark invoice as paid")
+      toast.error("Failed to mark invoice as paid", err.message || "")
     }
   }
 
@@ -382,8 +388,9 @@ export default function ReceptionistDashboard() {
     try {
       await updateAppointment(id, { status: "CHECKED-IN" })
       setAppointments(appointments.map(a => a.id === id ? { ...a, status: "checked-in" as const } : a))
+      toast.success("Patient checked in", `Appointment ${id} marked as checked-in.`)
     } catch (err: any) {
-      alert(err.message || "Failed to check in patient")
+      toast.error("Failed to check in patient", err.message || "")
     }
   }
 
@@ -391,8 +398,9 @@ export default function ReceptionistDashboard() {
     try {
       await updateAppointment(id, { status: "COMPLETED" })
       setAppointments(appointments.map(a => a.id === id ? { ...a, status: "completed" as const } : a))
+      toast.success("Visit completed", `Appointment ${id} marked as completed.`)
     } catch (err: any) {
-      alert(err.message || "Failed to mark visit completed")
+      toast.error("Failed to mark visit completed", err.message || "")
     }
   }
 
@@ -409,8 +417,9 @@ export default function ReceptionistDashboard() {
       setBeds(beds.map(b => b.bed_id === bedBooking.bedId ? res.data : b))
       setBedBooking({ bedId: "", patientName: "", status: "OCCUPIED" })
       setIsBedBookOpen(false)
+      toast.success("Bed booked", `Bed ${bedBooking.bedId} assigned successfully.`)
     } catch (err: any) {
-      alert(err.message || "Failed to book bed")
+      toast.error("Failed to book bed", err.message || "")
     }
   }
 
@@ -419,8 +428,9 @@ export default function ReceptionistDashboard() {
     try {
       const res = await updateBedStatus(bedId, { status: "AVAILABLE" })
       setBeds(beds.map(b => b.bed_id === bedId ? res.data : b))
+      toast.success("Bed released", `Bed ${bedId} is now available.`)
     } catch (err: any) {
-      alert(err.message || "Failed to release bed")
+      toast.error("Failed to release bed", err.message || "")
     }
   }
 

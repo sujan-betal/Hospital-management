@@ -33,6 +33,7 @@ import {
   BedCreatePayload,
   BedUpdatePayload,
 } from "@/services/admin.service"
+import { useToast } from "@/components/ui/toast"
 
 // Map the backend snake_case bed record onto the camelCase Bed shape
 // the admin components render.
@@ -50,6 +51,7 @@ function fromApiBed(b: ApiBed): Bed {
 }
 
 export default function AdminDashboard() {
+  const toast = useToast()
   const [activeTab, setActiveTab] = useState<string>("overview")
   
   // Hospital-wide state
@@ -99,8 +101,9 @@ export default function AdminDashboard() {
       setBeds((prev) =>
         prev.map((b) => (b.id === updatedBed.id ? fromApiBed(res.data) : b))
       )
+      toast.success("Bed updated", `${updatedBed.ward} bed ${updatedBed.id} saved.`)
     } catch (err: any) {
-      alert(err?.message || "Failed to update bed")
+      toast.error("Failed to update bed", err?.message || "")
     }
   }
 
@@ -118,9 +121,10 @@ export default function AdminDashboard() {
     try {
       const res = await createBed(payload)
       setBeds((prev) => [fromApiBed(res.data), ...prev])
+      toast.success("Bed added", `${newBed.ward} bed ${newBed.id} created.`)
       return true
     } catch (err: any) {
-      alert(err?.message || "Failed to add bed")
+      toast.error("Failed to add bed", err?.message || "")
       return false
     }
   }
@@ -129,9 +133,10 @@ export default function AdminDashboard() {
     try {
       await deleteBedApi(bedId)
       setBeds((prev) => prev.filter((b) => b.id !== bedId))
+      toast.success("Bed deleted", `Bed ${bedId} was removed.`)
       return true
     } catch (err: any) {
-      alert(err?.message || "Failed to delete bed")
+      toast.error("Failed to delete bed", err?.message || "")
       return false
     }
   }
