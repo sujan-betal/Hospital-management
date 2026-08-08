@@ -2,12 +2,13 @@ import logging
 import os
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formatdate, make_msgid
 
 import smtplib
 
-from dotenv import load_dotenv
+from src.config.env import load_env
 
-load_dotenv()
+load_env()
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,10 @@ def _send_html_email(to_email: str, subject: str, html_body: str) -> bool:
     msg["Subject"] = subject
     msg["From"] = f"{MAIL_FROM_NAME} <{MAIL_FROM or SMTP_USER}>"
     msg["To"] = to_email
+    msg["Reply-To"] = MAIL_FROM or SMTP_USER
+    # Proper Message-ID / Date headers keep the message out of the spam folder.
+    msg["Message-ID"] = make_msgid(domain=SMTP_USER.split("@")[-1] if "@" in (SMTP_USER or "") else None)
+    msg["Date"] = formatdate(localtime=True)
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
     try:

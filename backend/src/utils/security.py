@@ -3,9 +3,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Union, Any
 from jose import jwt
 from passlib.context import CryptContext
-from dotenv import load_dotenv
 
-load_dotenv()
+from src.config.env import load_env
+
+load_env()
 
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError

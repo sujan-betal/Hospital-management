@@ -1,6 +1,5 @@
 import os
 import uuid
-from datetime import timedelta
 
 from jose import jwt, JWTError
 from sqlalchemy import select, or_
@@ -11,15 +10,17 @@ from src.models.doctor_model import Doctor
 from src.models.receptionist_model import Receptionist
 from src.utils.common_schema import api_response_error, api_response_success
 from src.utils.email import send_password_reset_email
+from src.utils.reset import (
+    RESET_TOKEN_EXPIRE_MINUTES,
+    build_reset_link,
+    create_reset_token,
+)
 from src.utils.security import (
     create_access_token,
     get_password_hash,
     verify_password,
 )
 from src.utils.status_code import StatusCode
-
-RESET_TOKEN_EXPIRE_MINUTES = int(os.getenv("RESET_TOKEN_EXPIRE_MINUTES", "30"))
-FRONTEND_URI = os.getenv("FRONTEND_URI", "http://localhost:3000")
 
 
 def format_doctor_data(doctor: Doctor) -> dict:
@@ -44,18 +45,6 @@ def format_doctor_data(doctor: Doctor) -> dict:
         "upi_id": doctor.upi_id or "",
         "razorpayx_fund_account_id": doctor.razorpayx_fund_account_id or "",
     }
-
-
-def _build_reset_link(token: str) -> str:
-    return f"{FRONTEND_URI}/reset-password?token={token}"
-
-
-def _create_reset_token(user_id, role: str) -> str:
-    return create_access_token(
-        subject=user_id,
-        role=role,
-        expires_delta=timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES),
-    )
 
 
 async def create_doctor_service(
@@ -101,12 +90,12 @@ async def create_doctor_service(
 
         # user_id is only assigned after commit, so build the reset token now
         # to avoid embedding "None" as the UUID in the emailed link.
-        reset_token = _create_reset_token(doctor.user_id, "DOCTOR")
+        reset_token = create_reset_token(doctor.user_id, "DOCTOR")
         doctor.token = reset_token
         await db.commit()
         await db.refresh(doctor)
 
-        reset_link = _build_reset_link(reset_token)
+        reset_link = build_reset_link(reset_token)
         delivered = send_password_reset_email(
             to_email=doctor.email,
             full_name=doctor.user_name,
@@ -208,7 +197,7 @@ async def forgot_password_service(payload, db: AsyncSession):
         doctor = result.scalar_one_or_none()
 
         if doctor:
-            reset_token = _create_reset_token(doctor.user_id, doctor.role)
+            reset_token = create_reset_token(doctor.user_id, doctor.role)
             doctor.token = reset_token
             doctor.is_reset = True
             await db.commit()
@@ -216,7 +205,7 @@ async def forgot_password_service(payload, db: AsyncSession):
             send_password_reset_email(
                 to_email=doctor.email,
                 full_name=doctor.user_name,
-                reset_link=_build_reset_link(reset_token),
+                reset_link=build_reset_link(reset_token),
                 reset_minutes=RESET_TOKEN_EXPIRE_MINUTES,
             )
 
@@ -233,7 +222,7 @@ async def forgot_password_service(payload, db: AsyncSession):
         admin = admin_result.scalar_one_or_none()
 
         if admin:
-            reset_token = _create_reset_token(admin.user_id, admin.role)
+            reset_token = create_reset_token(admin.user_id, admin.role)
             admin.token = reset_token
             admin.is_reset = True
             await db.commit()
@@ -241,7 +230,7 @@ async def forgot_password_service(payload, db: AsyncSession):
             send_password_reset_email(
                 to_email=admin.email,
                 full_name=admin.user_name,
-                reset_link=_build_reset_link(reset_token),
+                reset_link=build_reset_link(reset_token),
                 reset_minutes=RESET_TOKEN_EXPIRE_MINUTES,
             )
 
@@ -252,7 +241,7 @@ async def forgot_password_service(payload, db: AsyncSession):
         receptionist = receptionist_result.scalar_one_or_none()
 
         if receptionist:
-            reset_token = _create_reset_token(receptionist.user_id, receptionist.role)
+            reset_token = create_reset_token(receptionist.user_id, receptionist.role)
             receptionist.token = reset_token
             receptionist.is_reset = True
             await db.commit()
@@ -260,7 +249,7 @@ async def forgot_password_service(payload, db: AsyncSession):
             send_password_reset_email(
                 to_email=receptionist.email,
                 full_name=receptionist.user_name,
-                reset_link=_build_reset_link(reset_token),
+                reset_link=build_reset_link(reset_token),
                 reset_minutes=RESET_TOKEN_EXPIRE_MINUTES,
             )
 

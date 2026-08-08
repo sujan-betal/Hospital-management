@@ -316,6 +316,7 @@ export function StaffCredentials({
       const userName = newUserName || deriveUserName(newFullName)
       let createdUserId: string | undefined
       let createdAdminId: number | undefined
+      let createdMessage: string | undefined
 
       if (newRole === "doctor") {
         const res = await createDoctor({
@@ -325,6 +326,7 @@ export function StaffCredentials({
           department: newDepartment || undefined,
         })
         createdUserId = res.data?.user_id
+        createdMessage = res.message
       } else if (newRole === "subadmin") {
         const res = await createSubAdmin({
           user_name: userName,
@@ -333,12 +335,14 @@ export function StaffCredentials({
         })
         createdUserId = res.data?.user_id
         createdAdminId = res.data?.id
+        createdMessage = res.message
       } else if (newRole === "receptionist") {
         const res = await createReceptionist({
           user_name: userName,
           email: newEmail,
         })
         createdUserId = res.data?.user_id
+        createdMessage = res.message
       } else {
         const res = await registerAdmin({
           user_name: userName,
@@ -346,6 +350,7 @@ export function StaffCredentials({
           password: generatePassword(),
         })
         createdUserId = res.data?.user_id
+        createdMessage = res.message
       }
 
       const now = new Date()
@@ -382,20 +387,20 @@ export function StaffCredentials({
       if (newRole === "doctor") {
         toast.success(
           "Doctor account created",
-          `Password-set email sent to ${newEmail}.`
+          createdMessage || `Password-set email sent to ${newEmail}.`
         )
       } else if (newRole === "receptionist") {
         toast.success(
           "Receptionist account created",
-          `Password-set email sent to ${newEmail}.`
+          createdMessage || `Password-set email sent to ${newEmail}.`
         )
       } else if (newRole === "subadmin") {
         toast.success(
           "Sub-admin account created",
-          `Password-set email sent to ${newEmail}.`
+          createdMessage || `Password-set email sent to ${newEmail}.`
         )
       } else {
-        toast.success("Admin credential created successfully.")
+        toast.success("Admin credential created successfully.", createdMessage)
       }
     } catch (err: any) {
       setCreateError(err.message || "Failed to create credential")

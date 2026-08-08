@@ -4,8 +4,8 @@ import os
 import time
 from contextlib import asynccontextmanager
 
-from dotenv import load_dotenv
-load_dotenv(".env")
+from src.config.env import load_env
+load_env()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

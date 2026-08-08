@@ -6,7 +6,7 @@ managed from here. Low-level DB helpers live in `receptionist_query.py`.
 
 import json
 import os
-from datetime import date, timedelta
+from datetime import date
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
@@ -32,31 +32,21 @@ from src.modules.hospital.hospital_query import bed_to_dict, find_bed_by_id
 from src.modules.hospital.hospital_service import VALID_BED_STATUSES
 from src.utils.common_schema import api_response_success, api_response_error
 from src.utils.email import send_password_reset_email
-from src.utils.security import create_access_token, get_password_hash
+from src.utils.reset import (
+    RESET_TOKEN_EXPIRE_MINUTES,
+    build_reset_link,
+    create_reset_token,
+)
+from src.utils.security import get_password_hash
 from src.utils.status_code import StatusCode
 
 VALID_APPOINTMENT_STATUSES = {"SCHEDULED", "CHECKED-IN", "COMPLETED", "CANCELLED"}
 VALID_INSURANCE_STATUSES = {"COVERED", "UNINSURED", "PENDING"}
 VALID_PAYMENT_STATUSES = {"PAID", "UNPAID"}
 
-RESET_TOKEN_EXPIRE_MINUTES = int(os.getenv("RESET_TOKEN_EXPIRE_MINUTES", "30"))
-FRONTEND_URI = os.getenv("FRONTEND_URI", "http://localhost:3000")
-
 
 def _today() -> str:
     return date.today().isoformat()
-
-
-def _build_reset_link(token: str) -> str:
-    return f"{FRONTEND_URI}/reset-password?token={token}"
-
-
-def _create_reset_token(user_id, role: str) -> str:
-    return create_access_token(
-        subject=user_id,
-        role=role,
-        expires_delta=timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES),
-    )
 
 
 # ─────────────────────── Receptionist Account ───────────────────────
@@ -100,12 +90,12 @@ async def create_receptionist_service(payload, db: AsyncSession):
 
         # user_id is only assigned after commit, so build the reset token now
         # to avoid embedding "None" as the UUID in the emailed link.
-        reset_token = _create_reset_token(receptionist.user_id, "RECEPTIONIST")
+        reset_token = create_reset_token(receptionist.user_id, "RECEPTIONIST")
         receptionist.token = reset_token
         await db.commit()
         await db.refresh(receptionist)
 
-        reset_link = _build_reset_link(reset_token)
+        reset_link = build_reset_link(reset_token)
         delivered = send_password_reset_email(
             to_email=receptionist.email,
             full_name=receptionist.user_name,

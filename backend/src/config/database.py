@@ -1,5 +1,4 @@
 import os
-from dotenv import load_dotenv
 
 from sqlalchemy.ext.asyncio import (
     create_async_engine,
@@ -8,8 +7,9 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from .base import Base
+from .env import load_env
 
-load_dotenv()
+load_env()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 

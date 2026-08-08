@@ -1,5 +1,4 @@
 from jose import jwt, JWTError, ExpiredSignatureError
-from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from typing import Optional
 import os
@@ -8,8 +7,9 @@ from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
+from src.config.env import load_env
 
-load_dotenv()
+load_env()
 
 DEFAULT_JWT_SECRET = "aura-medical-dev-secret-change-me-in-production"
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
