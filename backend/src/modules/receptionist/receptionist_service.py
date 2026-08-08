@@ -96,7 +96,7 @@ async def create_receptionist_service(payload, db: AsyncSession):
         await db.refresh(receptionist)
 
         reset_link = build_reset_link(reset_token)
-        delivered = send_password_reset_email(
+        delivered, email_reason = send_password_reset_email(
             to_email=receptionist.email,
             full_name=receptionist.user_name,
             reset_link=reset_link,
@@ -109,8 +109,8 @@ async def create_receptionist_service(payload, db: AsyncSession):
             "Receptionist account created. A password-set email has been sent to "
             f"{receptionist.email}."
             if delivered
-            else "Receptionist account created, but the password-set email could not be sent "
-                 "to the receptionist. Check the backend SMTP/console logs."
+            else f"Receptionist account created, but the password-set email could not "
+                 f"be sent to {receptionist.email}. {email_reason}"
         )
 
         return api_response_success(

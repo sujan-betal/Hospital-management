@@ -513,7 +513,7 @@ async def create_subadmin_service(
         await db.refresh(new_subadmin)
 
         reset_link = build_reset_link(reset_token)
-        delivered = send_password_reset_email(
+        delivered, email_reason = send_password_reset_email(
             to_email=new_subadmin.email,
             full_name=new_subadmin.user_name,
             reset_link=reset_link,
@@ -529,9 +529,9 @@ async def create_subadmin_service(
             "Sub-admin created successfully with assigned permissions. A password-set "
             f"email has been sent to {new_subadmin.email}."
             if delivered
-            else "Sub-admin created successfully with assigned permissions, but the "
-                 "password-set email could not be sent to the sub-admin. "
-                 "Check the backend SMTP/console logs."
+            else f"Sub-admin created successfully with assigned permissions, but the "
+                 f"password-set email could not be sent to {new_subadmin.email}. "
+                 f"{email_reason}"
         )
 
         return api_response_success(

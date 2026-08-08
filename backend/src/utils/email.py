@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formatdate, make_msgid
@@ -11,6 +12,15 @@ from src.config.env import load_env
 load_env()
 
 logger = logging.getLogger(__name__)
+
+
+def _plain_text_from_html(html: str) -> str:
+    """Crude HTML→text fallback for the multipart plain-text part."""
+    text = re.sub(r"<style.*?</style>", " ", html, flags=re.DOTALL)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = text.replace("&nbsp;", " ").replace("&amp;", "&")
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
 
 SMTP_HOST = os.getenv("SMTP_HOST")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
@@ -27,30 +37,78 @@ def email_configured() -> bool:
     return bool(SMTP_HOST and SMTP_USER)
 
 
-def _send_html_email(to_email: str, subject: str, html_body: str) -> bool:
-    """Send an HTML email over SMTP. Returns True if delivered."""
+def _domain_can_receive(email: str) -> bool:
+    """Check the recipient domain actually has a mail server (MX record).
+
+    Placeholder addresses such as `someone@test.com`, `@example.com` or
+    `@auracare.demo` have no MX record, so Gmail accepts the message and then
+    silently bounces it — the admin is told "email sent" but nobody receives
+    it. Catching this up front gives an honest error instead.
+    """
+    domain = (email or "").strip().rsplit("@", 1)[-1] if email else ""
+    if not domain or "." not in domain or " " in domain:
+        return False
+    try:
+        import dns.resolver
+
+        answers = dns.resolver.resolve(domain, "MX", lifetime=5)
+        # A null MX (RFC 7505, empty exchange) explicitly means "no mail here".
+        exchanges = [str(r.exchange).strip(".") for r in answers]
+        return any(exchanges)
+    except dns.resolver.NXDOMAIN:
+        return False
+    except dns.resolver.NoAnswer:
+        return False
+    except Exception:
+        # Transient DNS failure — don't block a legitimate send on it.
+        return True
+
+
+def _send_html_email(to_email: str, subject: str, html_body: str) -> tuple[bool, str]:
+    """Send an HTML email over SMTP.
+
+    Returns ``(delivered, reason)`` — ``reason`` is empty on success and holds
+    a human-readable explanation otherwise.
+    """
     if not email_configured():
         # Dev fallback: no SMTP configured, so log the email so the flow
         # can still be exercised locally.
+        reason = (
+            f"SMTP is not configured (set SMTP_HOST / SMTP_USER in backend/.env). "
+            "Email NOT delivered."
+        )
         logger.warning(
             "SMTP not configured. Email NOT delivered. [to=%s] [subject=%s]\n%s",
             to_email,
             subject,
             html_body,
         )
-        print(
-            f"\n[DEV EMAIL -> {to_email}] Subject: {subject}\n{html_body}\n"
-        )
-        return False
+        print(f"\n[DEV EMAIL -> {to_email}] Subject: {subject}\n{html_body}\n")
+        return False, reason
 
+    if not _domain_can_receive(to_email):
+        domain = (to_email or "").rsplit("@", 1)[-1]
+        reason = (
+            f"'{to_email}' cannot receive mail — the domain '{domain}' has no "
+            "mail server (MX record). Check that the staff member's email "
+            "address is a real, working inbox."
+        )
+        logger.warning("Email NOT sent: %s", reason)
+        print(f"[EMAIL FAILED -> {to_email}] {reason}")
+        return False, reason
+
+    # Multipart with a plain-text alternative reduces spam-folder placement.
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = f"{MAIL_FROM_NAME} <{MAIL_FROM or SMTP_USER}>"
     msg["To"] = to_email
     msg["Reply-To"] = MAIL_FROM or SMTP_USER
     # Proper Message-ID / Date headers keep the message out of the spam folder.
-    msg["Message-ID"] = make_msgid(domain=SMTP_USER.split("@")[-1] if "@" in (SMTP_USER or "") else None)
+    msg["Message-ID"] = make_msgid(
+        domain=SMTP_USER.split("@")[-1] if "@" in (SMTP_USER or "") else None
+    )
     msg["Date"] = formatdate(localtime=True)
+    msg.attach(MIMEText(_plain_text_from_html(html_body), "plain", "utf-8"))
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
     try:
@@ -61,14 +119,20 @@ def _send_html_email(to_email: str, subject: str, html_body: str) -> bool:
                 server.ehlo()
             if SMTP_PASSWORD:
                 server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(MAIL_FROM or SMTP_USER, [to_email], msg.as_string())
+            refused = server.sendmail(MAIL_FROM or SMTP_USER, [to_email], msg.as_string())
+        if refused:
+            reason = f"Mail server refused delivery to {to_email}: {refused}"
+            logger.error("Email delivery refused for %s: %s", to_email, refused)
+            print(f"[EMAIL FAILED -> {to_email}] {reason}")
+            return False, reason
         logger.info("Email delivered to %s via %s", to_email, SMTP_HOST)
         print(f"[EMAIL SENT -> {to_email}] Subject: {subject}")
-        return True
+        return True, ""
     except Exception as exc:
+        reason = f"SMTP error while sending to {to_email}: {exc}"
         logger.error("Failed to send email to %s: %s", to_email, exc)
         print(f"[EMAIL FAILED -> {to_email}] {exc}")
-        return False
+        return False, reason
 
 
 def send_password_reset_email(
@@ -78,8 +142,11 @@ def send_password_reset_email(
     reset_minutes: int = 30,
     login_email: str = None,
     login_username: str = None,
-) -> bool:
-    """Send a 'set your password' / 'reset password' email."""
+) -> tuple[bool, str]:
+    """Send a 'set your password' / 'reset password' email.
+
+    Returns ``(delivered, reason)``.
+    """
     subject = "AURA Medical - Set Up Your Account Password"
     login_block = ""
     if login_email or login_username:
@@ -136,8 +203,11 @@ def send_account_created_email(
     full_name: str,
     login_email: str,
     reset_link: str,
-) -> bool:
-    """Send a generic 'account created' email with the login email and reset link."""
+) -> tuple[bool, str]:
+    """Send a generic 'account created' email with the login email and reset link.
+
+    Returns ``(delivered, reason)``.
+    """
     subject = "AURA Medical - Your Account Has Been Created"
     html_body = f"""
     <div style="font-family:Arial,sans-serif;background:#f4f6f5;padding:32px 16px;">

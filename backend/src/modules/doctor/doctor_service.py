@@ -96,7 +96,7 @@ async def create_doctor_service(
         await db.refresh(doctor)
 
         reset_link = build_reset_link(reset_token)
-        delivered = send_password_reset_email(
+        delivered, email_reason = send_password_reset_email(
             to_email=doctor.email,
             full_name=doctor.user_name,
             reset_link=reset_link,
@@ -109,8 +109,8 @@ async def create_doctor_service(
             "Doctor account created. A password-set email has been sent to "
             f"{doctor.email}."
             if delivered
-            else "Doctor account created, but the password-set email could not be sent "
-                 "to the doctor. Check the backend SMTP/console logs."
+            else f"Doctor account created, but the password-set email could not be "
+                 f"sent to {doctor.email}. {email_reason}"
         )
 
         return api_response_success(
