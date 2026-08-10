@@ -84,8 +84,9 @@ class _PatientLoginFormState extends State<PatientLoginForm> {
         _otpSent = true;
         _sending = false;
         _demoOtp = demoCode ?? null;
-        _serverMessage =
-            'OTP sent to ${_phone.text.trim()} · Demo mode: ${demoCode ?? ''}';
+        _serverMessage = demoCode == null
+            ? 'OTP sent to ${_phone.text.trim()}'
+            : 'OTP sent to ${_phone.text.trim()} · Demo mode: $demoCode';
       });
       _startCountdown(30);
       _otpFocus.requestFocus();

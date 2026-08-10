@@ -1,7 +1,9 @@
-import 'package:flutter/material.dart';
 import 'dart:ui';
 
+import 'package:flutter/material.dart';
+
 import '../../../../core/theme/app_theme.dart';
+import '../../../../data/repositories/auth_repository.dart';
 import 'heartbeat_line.dart';
 import 'patient_login_form.dart';
 import 'staff_login_form.dart';
@@ -15,6 +17,46 @@ class LoginCard extends StatefulWidget {
 
 class _LoginCardState extends State<LoginCard> {
   bool _staff = false;
+
+  /// Staff login → POST /api/admin/login, persist the session and route by role.
+  Future<void> _staffLogin(String identifier, String password) async {
+    final session = await AuthRepository.loginStaff(
+      identifier: identifier,
+      password: password,
+    );
+    await AuthRepository.saveSession(session);
+    if (!mounted) return;
+    _navigateByRole(session.role);
+  }
+
+  /// Patient OTP → POST /api/patient/otp/send. Returns the demo OTP shown by
+  /// the dev-mode backend so the demo flow works without an SMS provider.
+  Future<String?> _sendPatientOtp(String phone) async {
+    final result = await AuthRepository.sendPatientOtp(phone);
+    return result.demoOtp;
+  }
+
+  /// Patient verify → POST /api/patient/otp/verify, persist the session.
+  Future<bool> _verifyPatientOtp(String phone, String otp) async {
+    final session = await AuthRepository.verifyPatientOtp(phone: phone, otp: otp);
+    await AuthRepository.saveSession(session);
+    if (mounted) _navigateByRole(session.role);
+    return true;
+  }
+
+  /// Redirect based on the `role` decoded from the token payload (web does the
+  /// same: doctor → doctor, receptionist → receptionist, else admin).
+  void _navigateByRole(String role) {
+    final normalized = role.toLowerCase();
+    final route = normalized == 'doctor'
+        ? '/dashboard/doctor'
+        : normalized == 'receptionist'
+            ? '/dashboard/receptionist'
+            : normalized == 'patient'
+                ? '/dashboard/patient'
+                : '/dashboard/admin';
+    Navigator.of(context).pushNamedAndRemoveUntil(route, (_) => false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -101,8 +143,58 @@ class _LoginCardState extends State<LoginCard> {
                       switchInCurve: Curves.easeOut,
                       switchOutCurve: Curves.easeIn,
                       child: _staff
-                          ? const StaffLoginForm(key: ValueKey('staff'))
-                          : const PatientLoginForm(key: ValueKey('patient')),
+                          ? StaffLoginForm(
+                              key: const ValueKey('staff'),
+                              onSubmit: _staffLogin,
+                            )
+                          : PatientLoginForm(
+                              key: const ValueKey('patient'),
+                              onSendOtp: _sendPatientOtp,
+                              onVerify: _verifyPatientOtp,
+                            ),
+                    ),
+                    const SizedBox(height: 18),
+                    const Row(
+                      children: [
+                        Expanded(child: Divider(height: 1)),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            'OR',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1,
+                              color: AppColors.textHint,
+                            ),
+                          ),
+                        ),
+                        Expanded(child: Divider(height: 1)),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      height: 46,
+                      child: OutlinedButton.icon(
+                        onPressed: () => Navigator.of(context)
+                            .pushNamedAndRemoveUntil(
+                          '/dashboard/admin',
+                          (_) => false,
+                        ),
+                        icon: const Icon(Icons.admin_panel_settings_rounded,
+                            size: 18),
+                        label: const Text(
+                          'Skip login — demo Admin Console',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.emeraldDark,
+                          side: BorderSide(
+                              color: AppColors.emeraldDark.withValues(alpha: 0.35)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
                     ),
                   ],
                 ),

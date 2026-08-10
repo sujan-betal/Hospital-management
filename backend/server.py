@@ -189,13 +189,21 @@ allowed_origins = [
     if origin.strip()
 ]
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Development builds serve the browser app from an arbitrary localhost port
+# (Flutter `flutter run -d chrome` picks a random port; Next.js uses 3000).
+# Without a matching CORS rule the browser blocks the login fetch preflight,
+# so nothing ever appears in the DevTools Network tab. The JWT flow only uses
+# headers (no cookies), so we can relax CORS in dev and keep the strict
+# FRONTEND_URI allow-list for production.
+is_dev = os.getenv("APP_ENV", "development").lower() == "development"
+
+cors_options = {
+    "allow_origins": ["*"] if is_dev else allowed_origins,
+    "allow_credentials": not is_dev,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+app.add_middleware(CORSMiddleware, **cors_options)
 
 
 @app.middleware("http")
