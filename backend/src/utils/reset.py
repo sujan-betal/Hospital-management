@@ -21,7 +21,9 @@ RESET_LINK_URI = (
 
 
 def build_reset_link(token: str) -> str:
-    return f"{RESET_LINK_URI}/reset-password?token={token}"
+    # The Flutter web app uses the default hash router, so the fragment carries
+    # the route + token: http://localhost:57872/#/reset-password?token=...
+    return f"{RESET_LINK_URI}/#/reset-password?token={token}"
 
 
 def create_reset_token(user_id, role: str) -> str:

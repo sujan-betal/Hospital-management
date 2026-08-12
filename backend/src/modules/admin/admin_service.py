@@ -56,6 +56,8 @@ async def _load_admin_permissions(db: AsyncSession, admin_id: int) -> list[str]:
 def _staff_to_dict(account, permissions: list[str] | None = None):
     data = {
         "user_id": str(account.user_id),
+        "id": str(account.user_id),
+        "employee_id": str(account.user_id),
         "user_name": account.user_name,
         "email": account.email,
         "role": account.role,

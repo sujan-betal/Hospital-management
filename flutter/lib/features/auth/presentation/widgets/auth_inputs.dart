@@ -34,14 +34,7 @@ class AuthTextField extends StatefulWidget {
 }
 
 class _AuthTextFieldState extends State<AuthTextField> {
-  late bool _obscure;
   bool _focused = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _obscure = widget.obscureText;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +76,7 @@ class _AuthTextFieldState extends State<AuthTextField> {
               child: TextField(
                 controller: widget.controller,
                 enabled: widget.enabled,
-                obscureText: _obscure,
+                obscureText: widget.obscureText,
                 keyboardType: widget.keyboardType,
                 textInputAction: widget.textInputAction,
                 onChanged: widget.onChanged,

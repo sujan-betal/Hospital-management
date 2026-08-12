@@ -12,7 +12,13 @@ services:
   frontend:
     build:
       context: ./frontend
+      args:
+        # Server-side /api/* rewrites must reach the backend by its compose
+        # service name; localhost would resolve to this container's own loopback.
+        BACKEND_URL: http://backend:8000
     ports:
       - "3000:3000"
+    environment:
+      BACKEND_URL: http://backend:8000
     depends_on:
       - backend

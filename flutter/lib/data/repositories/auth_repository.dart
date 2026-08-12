@@ -42,6 +42,17 @@ class AuthRepository {
     return OtpSendResult.fromJson(json['data'] as Map<String, dynamic>);
   }
 
+  /// `POST /api/doctor/reset-password` → sets a new password from a reset token.
+  static Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {
+    await ApiClient.instance.post('/api/doctor/reset-password', {
+      'token': token,
+      'new_password': newPassword,
+    });
+  }
+
   /// `POST /api/patient/otp/verify` → `{ data: {...patient, access_token} }`
   static Future<AuthSession> verifyPatientOtp({
     required String phone,

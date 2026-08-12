@@ -153,7 +153,7 @@ class AdminRepository {
 StaffCredential staffFromApi(Map<String, dynamic> json) {
   final role = _staffRoleFromApi((json['role'] ?? '') as String);
   return StaffCredential(
-    id: (json['id'] ?? json['employee_id'] ?? '') as String,
+    id: (json['id'] ?? json['employee_id'] ?? json['user_id'] ?? '') as String,
     userId: (json['user_id'] ?? json['user_id']) as String?,
     adminId: json['admin_id'] as int?,
     fullName: (json['user_name'] ?? json['full_name'] ?? '') as String,
