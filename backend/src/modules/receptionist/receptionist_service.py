@@ -51,7 +51,7 @@ def _today() -> str:
 
 # ─────────────────────── Receptionist Account ───────────────────────
 
-async def create_receptionist_service(payload, db: AsyncSession):
+async def create_receptionist_service(payload, db: AsyncSession, origin: str | None = None):
     """Admin-only: create a receptionist account and email a password-set link."""
     try:
         query = select(Receptionist).where(
@@ -95,7 +95,7 @@ async def create_receptionist_service(payload, db: AsyncSession):
         await db.commit()
         await db.refresh(receptionist)
 
-        reset_link = build_reset_link(reset_token)
+        reset_link = build_reset_link(reset_token, origin)
         delivered, email_reason = send_password_reset_email(
             to_email=receptionist.email,
             full_name=receptionist.user_name,

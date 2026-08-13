@@ -51,6 +51,7 @@ async def create_doctor_service(
     payload,
     created_by,
     db: AsyncSession,
+    origin: str | None = None,
 ):
     """Admin-only: create a doctor account and email a password-set link."""
     try:
@@ -95,7 +96,7 @@ async def create_doctor_service(
         await db.commit()
         await db.refresh(doctor)
 
-        reset_link = build_reset_link(reset_token)
+        reset_link = build_reset_link(reset_token, origin)
         delivered, email_reason = send_password_reset_email(
             to_email=doctor.email,
             full_name=doctor.user_name,
@@ -185,7 +186,7 @@ async def login_doctor_service(payload, db: AsyncSession):
         )
 
 
-async def forgot_password_service(payload, db: AsyncSession):
+async def forgot_password_service(payload, db: AsyncSession, origin: str | None = None):
     """Send a reset link to a doctor or admin by email."""
     try:
         email = payload.email
@@ -205,7 +206,7 @@ async def forgot_password_service(payload, db: AsyncSession):
             send_password_reset_email(
                 to_email=doctor.email,
                 full_name=doctor.user_name,
-                reset_link=build_reset_link(reset_token),
+                reset_link=build_reset_link(reset_token, origin),
                 reset_minutes=RESET_TOKEN_EXPIRE_MINUTES,
             )
 
@@ -230,7 +231,7 @@ async def forgot_password_service(payload, db: AsyncSession):
             send_password_reset_email(
                 to_email=admin.email,
                 full_name=admin.user_name,
-                reset_link=build_reset_link(reset_token),
+                reset_link=build_reset_link(reset_token, origin),
                 reset_minutes=RESET_TOKEN_EXPIRE_MINUTES,
             )
 
@@ -249,7 +250,7 @@ async def forgot_password_service(payload, db: AsyncSession):
             send_password_reset_email(
                 to_email=receptionist.email,
                 full_name=receptionist.user_name,
-                reset_link=build_reset_link(reset_token),
+                reset_link=build_reset_link(reset_token, origin),
                 reset_minutes=RESET_TOKEN_EXPIRE_MINUTES,
             )
 

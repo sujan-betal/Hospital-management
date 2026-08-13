@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config.database import get_db
@@ -20,6 +20,7 @@ from src.modules.doctor.doctor_service import (
     reset_password_service,
     update_bank_details_service,
 )
+from src.utils.reset import request_origin
 
 router = APIRouter(prefix="/api", tags=["Doctor"])
 
@@ -27,10 +28,11 @@ router = APIRouter(prefix="/api", tags=["Doctor"])
 @router.post("/admin/doctors")
 async def create_doctor(
     payload: DoctorCreateRequest,
+    request: Request,
     admin=Depends(authorization(allowed_roles=["ADMIN", "SUBADMIN"])),
     db: AsyncSession = Depends(get_db),
 ):
-    return await create_doctor_service(payload, admin.user_id, db)
+    return await create_doctor_service(payload, admin.user_id, db, request_origin(request))
 
 
 @router.post("/doctor/login")
@@ -44,9 +46,10 @@ async def login_doctor(
 @router.post("/doctor/forgot-password")
 async def forgot_doctor_password(
     payload: DoctorForgotPasswordRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    return await forgot_password_service(payload, db)
+    return await forgot_password_service(payload, db, request_origin(request))
 
 
 @router.post("/doctor/reset-password")

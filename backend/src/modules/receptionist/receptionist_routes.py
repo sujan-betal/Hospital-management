@@ -1,7 +1,7 @@
 
 import uuid as uuid_lib
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config.database import get_db
@@ -29,6 +29,7 @@ from src.modules.receptionist.receptionist_service import (
     update_invoice_service,
 )
 from src.modules.hospital.hospital_service import list_beds_service
+from src.utils.reset import request_origin
 
 router = APIRouter(prefix="/api/receptionist", tags=["Receptionist"])
 
@@ -56,10 +57,11 @@ async def update_bed_status(
 @router.post("/register")
 async def create_receptionist(
     payload: ReceptionistCreateRequest,
+    request: Request,
     admin=Depends(authorization(allowed_roles=["ADMIN", "SUBADMIN"])),
     db: AsyncSession = Depends(get_db),
 ):
-    return await create_receptionist_service(payload, db)
+    return await create_receptionist_service(payload, db, request_origin(request))
 
 
 @router.get("/doctors")

@@ -467,7 +467,8 @@ async def login_staff_service(
 async def create_subadmin_service(
     payload,
     created_by,
-    db: AsyncSession
+    db: AsyncSession,
+    origin: str | None = None,
 ):
     """Create a SUBADMIN account and grant the requested permissions."""
     try:
@@ -514,7 +515,7 @@ async def create_subadmin_service(
         await db.commit()
         await db.refresh(new_subadmin)
 
-        reset_link = build_reset_link(reset_token)
+        reset_link = build_reset_link(reset_token, origin)
         delivered, email_reason = send_password_reset_email(
             to_email=new_subadmin.email,
             full_name=new_subadmin.user_name,

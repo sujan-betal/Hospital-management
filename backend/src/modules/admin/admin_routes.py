@@ -1,7 +1,7 @@
 
 import uuid as uuid_lib
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config.database import get_db
@@ -26,6 +26,7 @@ from src.modules.admin.admin_service import (
     update_staff_service,
 )
 from src.modules.doctor.doctor_schema import DoctorBankDetailsRequest
+from src.utils.reset import request_origin
 
 router = APIRouter(prefix="/api/admin", tags=["Admin Authentication"])
 
@@ -46,6 +47,7 @@ async def login_admin(
 @router.post("/subadmins")
 async def create_subadmin(
     payload: SubAdminCreateRequest,
+    request: Request,
     admin=Depends(
         authorization(
             allowed_roles=["ADMIN", "SUBADMIN"],
@@ -54,7 +56,7 @@ async def create_subadmin(
     ),
     db: AsyncSession = Depends(get_db),
 ):
-    return await create_subadmin_service(payload, admin.user_id, db)
+    return await create_subadmin_service(payload, admin.user_id, db, request_origin(request))
 
 @router.put("/permissions")
 async def assign_permissions(

@@ -84,6 +84,48 @@ async def seed_hospital_data():
         await db.commit()
 
 
+async def seed_default_admin():
+    """Ensure the default super-admin login (`admin` / `Admin@1234`) exists.
+
+    If an `admin` username already exists (e.g. registered manually), its
+    password is reset to the documented default so the login always works.
+    """
+    from sqlalchemy import select
+
+    from src.config.database import SessionLocal
+    from src.models.admin_model import Admin
+    from src.utils.security import get_password_hash
+
+    default_email = "admin@aurahospital.com"
+
+    async with SessionLocal() as db:
+        result = await db.execute(
+            select(Admin).where(Admin.user_name == "admin")
+        )
+        admin = result.scalar_one_or_none()
+
+        if admin:
+            db.add(admin)
+            admin.password = get_password_hash("Admin@1234")
+            admin.role = "ADMIN"
+            admin.status = "ACTIVE"
+            admin.is_reset = False
+            admin.is_deleted = False
+            await db.commit()
+            return
+
+        db.add(
+            Admin(
+                user_name="admin",
+                email=default_email,
+                password=get_password_hash("Admin@1234"),
+                role="ADMIN",
+                status="ACTIVE",
+            )
+        )
+        await db.commit()
+
+
 async def seed_receptionist_data():
     """Insert demo patients/appointments/invoices only when empty."""
     from sqlalchemy import func, select
@@ -163,6 +205,8 @@ async def lifespan(app: FastAPI):
     try:
         await run_migrations()
         print("[STARTUP] Schema migrations applied (alembic upgrade head).")
+        await seed_default_admin()
+        print("[STARTUP] Default admin seeded (`admin` / `Admin@1234`).")
         await seed_demo_doctors()
         print("[STARTUP] Demo doctor directory ensured.")
         await seed_hospital_data()
