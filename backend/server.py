@@ -1,6 +1,7 @@
 # backend/server.py
 
 import os
+import re
 import time
 from contextlib import asynccontextmanager
 
@@ -233,6 +234,14 @@ allowed_origins = [
     if origin.strip()
 ]
 
+# Flutter's `flutter run -d chrome` / `web-server` picks a random localhost
+# port on every launch, so a local web app can never be listed explicitly in
+# FRONTEND_URI. Allow any localhost / 127.0.0.1 origin so the dev Flutter app
+# can talk to this backend whether it runs locally or is deployed (e.g.
+# Render). The explicit FRONTEND_URI list still governs real deployed
+# frontends, and the JWT flow only uses headers (no cookies).
+LOCALHOST_ORIGIN_RE = re.compile(r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$")
+
 # Development builds serve the browser app from an arbitrary localhost port
 # (Flutter `flutter run -d chrome` picks a random port; Next.js uses 3000).
 # Without a matching CORS rule the browser blocks the login fetch preflight,
@@ -243,6 +252,7 @@ is_dev = os.getenv("APP_ENV", "development").lower() == "development"
 
 cors_options = {
     "allow_origins": ["*"] if is_dev else allowed_origins,
+    "allow_origin_regex": LOCALHOST_ORIGIN_RE,
     "allow_credentials": not is_dev,
     "allow_methods": ["*"],
     "allow_headers": ["*"],
