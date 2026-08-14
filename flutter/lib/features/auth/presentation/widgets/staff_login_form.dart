@@ -112,22 +112,30 @@ class _StaffLoginFormState extends State<StaffLoginForm> {
             icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility),
           ),
         ),
-        const Align(
+        Align(
           alignment: Alignment.centerRight,
           child: Padding(
-            padding: EdgeInsets.only(top: 6),
+            padding: const EdgeInsets.only(top: 6),
             child: SizedBox(
               width: 130,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    'Forgot password?',
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.accentRed,
+                  InkWell(
+                    onTap: () => Navigator.of(context)
+                        .pushNamed('/forgot-password'),
+                    borderRadius: BorderRadius.circular(4),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 2),
+                      child: Text(
+                        'Forgot password?',
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.accentRed,
+                        ),
+                      ),
                     ),
                   ),
                 ],

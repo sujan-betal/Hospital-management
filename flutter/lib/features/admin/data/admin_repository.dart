@@ -1,5 +1,4 @@
 import '../../../core/network/api_client.dart';
-import '../../../data/models/auth_models.dart';
 import 'admin_models.dart';
 
 /// API layer for the admin console — mirrors the web app's `admin.service.ts`,
@@ -90,23 +89,26 @@ class AdminRepository {
 
   // ---- Staff & credentials (admin_routes + receptionist_routes) -----------
 
-  static Future<void> createReceptionist(Map<String, dynamic> payload) async {
-    await ApiClient.instance.post('/api/receptionist/register', payload);
+  /// Returns the backend's `message` (e.g. whether the password-set email was
+  /// actually delivered), so the UI can report the real outcome to the admin.
+  static Future<String> createReceptionist(Map<String, dynamic> payload) async {
+    final json = await ApiClient.instance.post('/api/receptionist/register', payload);
+    return (json['message'] as String?) ?? 'Receptionist account created.';
   }
 
-  static Future<AuthSession> createDoctor(Map<String, dynamic> payload) async {
+  static Future<String> createDoctor(Map<String, dynamic> payload) async {
     final json = await ApiClient.instance.post('/api/admin/doctors', payload);
-    return AuthSession.fromJson((json['data'] ?? {}) as Map<String, dynamic>);
+    return (json['message'] as String?) ?? 'Doctor account created.';
   }
 
-  static Future<AuthSession> registerAdmin(Map<String, dynamic> payload) async {
+  static Future<String> registerAdmin(Map<String, dynamic> payload) async {
     final json = await ApiClient.instance.post('/api/admin/register', payload);
-    return AuthSession.fromJson((json['data'] ?? {}) as Map<String, dynamic>);
+    return (json['message'] as String?) ?? 'Account created.';
   }
 
-  static Future<AuthSession> createSubAdmin(Map<String, dynamic> payload) async {
+  static Future<String> createSubAdmin(Map<String, dynamic> payload) async {
     final json = await ApiClient.instance.post('/api/admin/subadmins', payload);
-    return AuthSession.fromJson((json['data'] ?? {}) as Map<String, dynamic>);
+    return (json['message'] as String?) ?? 'Sub-admin created.';
   }
 
   static Future<void> updatePermissions(Map<String, dynamic> payload) async {

@@ -402,13 +402,14 @@ class _StaffCredentialsTabState extends State<StaffCredentialsTab> {
       _creating = true;
       _cError = null;
     });
+    String resultMessage = 'Account created.';
     try {
       final username = _cUsername.text.trim().isNotEmpty
           ? _cUsername.text.trim()
           : _deriveUsername(name);
       switch (_cRole) {
         case 'doctor':
-          await AdminRepository.createDoctor({
+          resultMessage = await AdminRepository.createDoctor({
             'user_name': username,
             'email': email,
             'phone': _cPhone.text.trim().isEmpty ? null : _cPhone.text.trim(),
@@ -416,20 +417,20 @@ class _StaffCredentialsTabState extends State<StaffCredentialsTab> {
           });
           break;
         case 'receptionist':
-          await AdminRepository.createReceptionist({
+          resultMessage = await AdminRepository.createReceptionist({
             'user_name': username,
             'email': email,
           });
           break;
         case 'subadmin':
-          await AdminRepository.createSubAdmin({
+          resultMessage = await AdminRepository.createSubAdmin({
             'user_name': username,
             'email': email,
             'permissions': _cPermissions,
           });
           break;
         default:
-          await AdminRepository.registerAdmin({
+          resultMessage = await AdminRepository.registerAdmin({
             'user_name': username,
             'email': email,
             'password': _generatePassword(),
@@ -467,7 +468,7 @@ class _StaffCredentialsTabState extends State<StaffCredentialsTab> {
       setState(() => _staff = [newCred, ..._staff]);
       widget.onAdd(newCred);
       Navigator.of(context).pop();
-      showAdminToast(context, '${capitalize(_cRole)} account created — password email sent to $email.');
+      showAdminToast(context, resultMessage);
     } catch (e) {
       setState(() => _cError = e.toString());
     } finally {
