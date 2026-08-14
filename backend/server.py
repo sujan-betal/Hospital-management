@@ -1,7 +1,6 @@
 # backend/server.py
 
 import os
-import re
 import time
 from contextlib import asynccontextmanager
 
@@ -228,32 +227,16 @@ app.include_router(receptionist_router)
 app.include_router(patient_router)
 
 
-allowed_origins = [
-    origin.strip()
-    for origin in os.getenv("FRONTEND_URI", "").split(",")
-    if origin.strip()
-]
-
-# Flutter's `flutter run -d chrome` / `web-server` picks a random localhost
-# port on every launch, so a local web app can never be listed explicitly in
-# FRONTEND_URI. Allow any localhost / 127.0.0.1 origin so the dev Flutter app
-# can talk to this backend whether it runs locally or is deployed (e.g.
-# Render). The explicit FRONTEND_URI list still governs real deployed
-# frontends, and the JWT flow only uses headers (no cookies).
-LOCALHOST_ORIGIN_RE = re.compile(r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$")
-
-# Development builds serve the browser app from an arbitrary localhost port
-# (Flutter `flutter run -d chrome` picks a random port; Next.js uses 3000).
-# Without a matching CORS rule the browser blocks the login fetch preflight,
-# so nothing ever appears in the DevTools Network tab. The JWT flow only uses
-# headers (no cookies), so we can relax CORS in dev and keep the strict
-# FRONTEND_URI allow-list for production.
-is_dev = os.getenv("APP_ENV", "development").lower() == "development"
-
+# The API authenticates with JWTs in the Authorization header (no cookies), so
+# cross-origin requests carry no ambient credentials — this is the standard
+# token-API pattern (Stripe, etc.). Allow ANY origin: Flutter's
+# `flutter run -d chrome` uses a random localhost port on every launch, and the
+# deployed Flutter web app serves from its own origin, so a strict CORS
+# allow-list is what produces "Failed to fetch" during login. Without cookies
+# there is nothing to hijack, so this is safe.
 cors_options = {
-    "allow_origins": ["*"] if is_dev else allowed_origins,
-    "allow_origin_regex": LOCALHOST_ORIGIN_RE,
-    "allow_credentials": not is_dev,
+    "allow_origins": ["*"],
+    "allow_credentials": False,
     "allow_methods": ["*"],
     "allow_headers": ["*"],
 }
