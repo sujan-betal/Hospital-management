@@ -328,12 +328,15 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             drawer: SizedBox(width: 260, child: sidebar),
             body: Column(
               children: [
-                AdminNavbar(
-                  title: _current.label,
-                  userName: _userName,
-                  userEmail: _userEmail,
-                  onSignOut: _signOut,
-                  onMenuTap: () => scaffoldKey.currentState?.openDrawer(),
+                SafeArea(
+                  bottom: false,
+                  child: AdminNavbar(
+                    title: _current.label,
+                    userName: _userName,
+                    userEmail: _userEmail,
+                    onSignOut: _signOut,
+                    onMenuTap: () => scaffoldKey.currentState?.openDrawer(),
+                  ),
                 ),
                 Expanded(child: content),
               ],
@@ -349,11 +352,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               Expanded(
                 child: Column(
                   children: [
-                    AdminNavbar(
-                      title: _current.label,
-                      userName: _userName,
-                      userEmail: _userEmail,
-                      onSignOut: _signOut,
+                    SafeArea(
+                      bottom: false,
+                      child: AdminNavbar(
+                        title: _current.label,
+                        userName: _userName,
+                        userEmail: _userEmail,
+                        onSignOut: _signOut,
+                      ),
                     ),
                     Expanded(
                       child: Container(

@@ -29,13 +29,16 @@ class ApiClient {
 
   /// Base URL of the FastAPI backend.
   ///
-  /// Override at build/run time with `--dart-define=API_BASE_URL=...`.
+  /// Defaults to the deployed backend; override at build/run time with
+  /// `--dart-define=API_BASE_URL=http://localhost:8000` for local development.
   /// Android emulators reach the host machine via `10.0.2.2`.
   static const String _envBaseUrl = String.fromEnvironment('API_BASE_URL');
 
+  static const String _defaultBaseUrl = 'https://hospital-management-96s6.onrender.com';
+
   static String get baseUrl {
     if (_envBaseUrl.isNotEmpty) return _envBaseUrl;
-    return 'http://localhost:8000';
+    return _defaultBaseUrl;
   }
 
   String? _accessToken;

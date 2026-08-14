@@ -42,6 +42,14 @@ class AuthRepository {
     return OtpSendResult.fromJson(json['data'] as Map<String, dynamic>);
   }
 
+  /// `POST /api/doctor/forgot-password` → sends a password-set link to the email
+  /// if an account exists (doctors, admins, receptionists).
+  static Future<void> forgotPassword({required String email}) async {
+    await ApiClient.instance.post('/api/doctor/forgot-password', {
+      'email': email,
+    });
+  }
+
   /// `POST /api/doctor/reset-password` → sets a new password from a reset token.
   static Future<void> resetPassword({
     required String token,

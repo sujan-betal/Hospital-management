@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 
 import '../features/admin/presentation/pages/admin_dashboard_page.dart';
+import '../features/auth/presentation/pages/forgot_password_page.dart';
 import '../features/auth/presentation/pages/login_page.dart';
 import '../features/auth/presentation/pages/reset_password_page.dart';
 import '../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../features/doctor/presentation/pages/doctor_dashboard_page.dart';
+import '../features/patient/presentation/pages/patient_dashboard_page.dart';
 
 class AppRoutes {
   AppRoutes._();
 
   static const String login = '/login';
   static const String resetPassword = '/reset-password';
+  static const String forgotPassword = '/forgot-password';
   static const String dashboardAdmin = '/dashboard/admin';
   static const String dashboardDoctor = '/dashboard/doctor';
   static const String dashboardReceptionist = '/dashboard/receptionist';
@@ -34,6 +37,11 @@ class AppRoutes {
           ),
           settings: settings,
         );
+      case forgotPassword:
+        return MaterialPageRoute(
+          builder: (_) => const ForgotPasswordPage(),
+          settings: settings,
+        );
       case dashboardAdmin:
         return MaterialPageRoute(
           builder: (_) => const AdminDashboardPage(),
@@ -47,7 +55,10 @@ class AppRoutes {
       case dashboardReceptionist:
         return _portalRoute(settings, 'Receptionist');
       case dashboardPatient:
-        return _portalRoute(settings, 'Patient');
+        return MaterialPageRoute(
+          builder: (_) => const PatientDashboardPage(),
+          settings: settings,
+        );
       default:
         return null;
     }
