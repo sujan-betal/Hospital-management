@@ -5,11 +5,12 @@ duplicated across the doctor, admin and receptionist modules. Also normalises
 ``FRONTEND_URI`` (which may contain several comma-separated origins for CORS)
 down to a single origin so the emailed link is always a valid URL.
 
-``build_reset_link`` prefers the browser ``Origin`` of the request that
-triggered the email. Flutter's `flutter run -d chrome` picks a random port on
-every run, so the reset link built from a hardcoded origin would point at an
-app that isn't running. Using the live origin keeps the emailed link correct no
-matter which port the dev server chose.
+``build_reset_link`` prefers the configured ``RESET_LINK_URI`` so the emailed
+link is always stable and reachable by the recipient. For local development
+this must match the port the Flutter web app is served on — run it via
+``flutter/run_web.ps1`` (pinned to 57087) so the URL in every email points at a
+running app. The browser ``Origin`` is only used as a last-resort fallback when
+``RESET_LINK_URI`` cannot be read from ``backend/.env``.
 """
 
 import os
@@ -61,7 +62,10 @@ def request_origin(request: Request) -> str | None:
 
 
 def build_reset_link(token: str, origin: str | None = None) -> str:
-    base = origin or RESET_LINK_URI
+    # Emailed links must not depend on the admin's browser session (which can
+    # be a random `flutter run` port that dies on restart), so RESET_LINK_URI
+    # wins. `origin` is only a fallback when no RESET_LINK_URI is configured.
+    base = RESET_LINK_URI or origin or "http://localhost:3000"
     # The Flutter web app uses the default hash router, so the reset link must
     # carry the route + token in the fragment: http://localhost:57087/#/reset-password?token=...
     return f"{base.rstrip('/')}/#/reset-password?token={token}"

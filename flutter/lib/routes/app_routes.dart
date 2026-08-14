@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import '../features/admin/presentation/pages/admin_dashboard_page.dart';
 import '../features/auth/presentation/pages/login_page.dart';
 import '../features/auth/presentation/pages/reset_password_page.dart';
-import '../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../features/doctor/presentation/pages/doctor_dashboard_page.dart';
+import '../features/patient/presentation/pages/patient_dashboard_page.dart';
+import '../features/receptionist/presentation/pages/receptionist_dashboard_page.dart';
 
 class AppRoutes {
   AppRoutes._();
@@ -45,18 +46,17 @@ class AppRoutes {
           settings: settings,
         );
       case dashboardReceptionist:
-        return _portalRoute(settings, 'Receptionist');
+        return MaterialPageRoute(
+          builder: (_) => const ReceptionistDashboardPage(),
+          settings: settings,
+        );
       case dashboardPatient:
-        return _portalRoute(settings, 'Patient');
+        return MaterialPageRoute(
+          builder: (_) => const PatientDashboardPage(),
+          settings: settings,
+        );
       default:
         return null;
     }
-  }
-
-  static Route<dynamic> _portalRoute(RouteSettings settings, String portal) {
-    return MaterialPageRoute(
-      builder: (_) => DashboardPage(portal: portal),
-      settings: settings,
-    );
   }
 }
