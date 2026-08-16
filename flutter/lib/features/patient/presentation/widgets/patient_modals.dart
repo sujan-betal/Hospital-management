@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/patient_models.dart';
 import '../patient_colors.dart';
+import '../tabs/book_tab.dart';
 import 'patient_common.dart';
 
 /// Wraps a modal body in the light portal chrome used by the web app.
@@ -290,7 +291,7 @@ class _RescheduleModalBodyState extends State<RescheduleModalBody> {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: patientSlots.map((slot) {
+          children: kPatientSlots.map((slot) {
             final isCurrent = slot == _time;
             final taken = _isTaken(slot);
             return InkWell(

@@ -64,7 +64,12 @@ def _domain_can_receive(email: str) -> bool:
         return True
 
 
-def _send_html_email(to_email: str, subject: str, html_body: str) -> tuple[bool, str]:
+def _send_html_email(
+    to_email: str,
+    subject: str,
+    html_body: str,
+    recipient_name: str | None = None,
+) -> tuple[bool, str]:
     """Send an HTML email over SMTP.
 
     Returns ``(delivered, reason)`` — ``reason`` is empty on success and holds
@@ -101,7 +106,9 @@ def _send_html_email(to_email: str, subject: str, html_body: str) -> tuple[bool,
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = f"{MAIL_FROM_NAME} <{MAIL_FROM or SMTP_USER}>"
-    msg["To"] = to_email
+    msg["To"] = (
+        f"{recipient_name} <{to_email}>" if recipient_name else to_email
+    )
     msg["Reply-To"] = MAIL_FROM or SMTP_USER
     # Proper Message-ID / Date headers keep the message out of the spam folder.
     msg["Message-ID"] = make_msgid(
@@ -195,7 +202,9 @@ def send_password_reset_email(
       </div>
     </div>
     """
-    return _send_html_email(to_email, subject, html_body)
+    return _send_html_email(
+        to_email, subject, html_body, recipient_name=full_name
+    )
 
 
 def send_account_created_email(
@@ -232,4 +241,6 @@ def send_account_created_email(
       </div>
     </div>
     """
-    return _send_html_email(to_email, subject, html_body)
+    return _send_html_email(
+        to_email, subject, html_body, recipient_name=full_name
+    )
