@@ -1,32 +1,44 @@
-# Flutter Mobile App
+# 📱 Flutter Mobile App — AURA Medical Center
 
-Company-style Flutter structure for the Hospital Management project.
+Companion **Flutter** client for the Hospital Management System, mirroring the web app against the same FastAPI backend.
 
-## Repository structure
+## Quick Start
 
-- `backend/` - existing backend API
-- `frontend/` - existing web application
-- `flutter/` - Flutter mobile application
+```bash
+flutter pub get
+
+# Defaults to the deployed backend; override for local development:
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000   # Android emulator
+flutter run --dart-define=API_BASE_URL=http://localhost:8000  # iOS / desktop
+```
 
 ## Architecture
 
-The mobile app follows a feature-first + layered architecture:
+Feature-first + layered:
 
-- `core/` - app-wide infrastructure, networking, theme, storage, utilities
-- `data/` - API/data sources, models, repository implementations
-- `domain/` - business entities, repository contracts, use cases
-- `features/` - feature-specific UI and logic
-- `routes/` - navigation
-- `shared/` - reusable widgets, extensions, enums, validators
-- `assets/` - images, icons and fonts
-- `test/` - unit/widget tests
+| Layer | Responsibility |
+|-------|----------------|
+| `core/` | App-wide infrastructure — networking (`ApiClient`), theme, storage, utilities |
+| `data/` | API sources, models, repository implementations (auth session) |
+| `domain/` | Business entities, repository contracts, use cases |
+| `features/` | Feature-specific UI and logic — `admin/`, `doctor/`, `receptionist/`, `patient/`, `auth/`, `dashboard/`, `profile/` |
+| `routes/` | App navigation |
+| `shared/` | Reusable widgets, extensions, enums, validators |
+| `assets/` | Images, icons and fonts |
+| `test/` | Unit / widget tests |
 
-## Important
+## Networking
 
-This ZIP contains the recommended source structure. After extracting it into the repository, run:
+All HTTP traffic flows through `lib/core/network/api_client.dart`:
+
+- Base URL via `--dart-define=API_BASE_URL` (default: `https://hospital-management-96s6.onrender.com`)
+- Attaches `Authorization: Bearer <JWT>` automatically
+- Unwraps the `{ data, message, success }` envelope
+- All **65 backend endpoints** are wired through the feature repositories
+
+## Validation
 
 ```bash
-flutter create .
+flutter analyze
+flutter test
 ```
-
-from inside the `flutter` directory to generate the standard Flutter platform files (`android/`, `ios/`, `web/`, etc.) and `pubspec.yaml`.
