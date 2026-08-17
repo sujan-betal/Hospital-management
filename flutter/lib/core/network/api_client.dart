@@ -65,6 +65,14 @@ class ApiClient {
 
   Future<dynamic> delete(String path) => _send('DELETE', path, null);
 
+  /// `GET /health` — backend liveness probe. Returns `true` when the server
+  /// answers `{ "status": "ok" }` (the endpoint returns a bare JSON object,
+  /// not the `{ data, message }` envelope).
+  Future<bool> checkHealth() async {
+    final json = await _send('GET', '/health', null);
+    return (json is Map && json['status'] == 'ok');
+  }
+
   Future<dynamic> _send(String method, String path, Object? body) async {
     final uri = Uri.parse('$baseUrl$path');
     final encoded = body == null ? null : jsonEncode(body);

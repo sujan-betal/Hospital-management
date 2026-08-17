@@ -77,3 +77,15 @@ export const api = {
     request<T>(endpoint, { method: "PATCH", body: JSON.stringify(body) }),
   delete: <T>(endpoint: string) => request<T>(endpoint, { method: "DELETE" }),
 }
+
+// `GET /health` returns a bare `{ status: "ok" }` object (no envelope), so it
+// bypasses the `request()` wrapper.
+export async function checkHealth(): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE_URL}/health`)
+    const json: any = await res.json()
+    return json?.status === "ok"
+  } catch {
+    return false
+  }
+}

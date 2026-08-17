@@ -34,6 +34,18 @@ class AuthRepository {
     return _handleSession(json);
   }
 
+  /// Dedicated doctor login (also requires a password set via the reset link).
+  ///
+  /// `POST /api/doctor/login` → `{ data: {...doctor, access_token}, ... }`
+  static Future<AuthSession> loginDoctor({
+    required String identifier,
+    required String password,
+  }) async {
+    final json = await ApiClient.instance
+        .post('/api/doctor/login', {'email': identifier, 'password': password});
+    return _handleSession(json);
+  }
+
   /// `POST /api/patient/otp/send` → `{ data: {phone, otp?, expires_in}, ... }`
   static Future<OtpSendResult> sendPatientOtp(String phone) async {
     final json = await ApiClient.instance.post('/api/patient/otp/send', {

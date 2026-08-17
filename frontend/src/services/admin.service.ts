@@ -187,3 +187,107 @@ export async function updateBed(bedId: string, payload: BedUpdatePayload) {
 export async function deleteBed(bedId: string) {
   return api.delete<ApiResponse<null>>(`/api/admin/beds/${bedId}`)
 }
+
+// ─── Patient Admissions ──────────────────────────────────────
+
+export interface Admission {
+  id: number
+  admission_id: string
+  patient_name: string
+  patient_age: number
+  patient_gender: string
+  ward_type: string
+  bed_id: string
+  admit_date: string
+  discharge_date: string | null
+  billing_amount: number
+  status: string
+  insurance_status: string
+  patient_email: string
+  patient_phone: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AdmissionCreatePayload {
+  patient_name: string
+  patient_age: number
+  patient_gender?: string
+  ward_type?: string
+  bed_id?: string
+  admit_date: string
+  discharge_date?: string | null
+  billing_amount?: number
+  status?: string
+  insurance_status?: string
+  patient_email?: string
+  patient_phone?: string
+}
+
+export type AdmissionUpdatePayload = Partial<AdmissionCreatePayload>
+
+export async function listAdmissions() {
+  return api.get<ApiResponse<Admission[]>>("/api/admin/admissions")
+}
+
+export async function createAdmission(payload: AdmissionCreatePayload) {
+  return api.post<ApiResponse<Admission>>("/api/admin/admissions", payload)
+}
+
+export async function updateAdmission(
+  admissionId: string,
+  payload: AdmissionUpdatePayload
+) {
+  return api.put<ApiResponse<Admission>>(
+    `/api/admin/admissions/${admissionId}`,
+    payload
+  )
+}
+
+export async function deleteAdmission(admissionId: string) {
+  return api.delete<ApiResponse<null>>(`/api/admin/admissions/${admissionId}`)
+}
+
+// ─── Clinical Tasks ──────────────────────────────────────────
+
+export interface ClinicalTask {
+  id: number
+  task_id: string
+  bed_id: string
+  task_description: string
+  priority: string
+  assigned_to: string
+  status: string
+  task_type: string
+  timestamp: string
+  created_at: string
+  updated_at: string
+}
+
+export interface TaskCreatePayload {
+  bed_id: string
+  task_description: string
+  priority?: string
+  assigned_to: string
+  status?: string
+  task_type?: string
+  timestamp?: string
+}
+
+export type TaskUpdatePayload = Partial<TaskCreatePayload>
+
+export async function listTasks() {
+  return api.get<ApiResponse<ClinicalTask[]>>("/api/admin/tasks")
+}
+
+export async function createTask(payload: TaskCreatePayload) {
+  return api.post<ApiResponse<ClinicalTask>>("/api/admin/tasks", payload)
+}
+
+export async function updateTask(taskId: string, payload: TaskUpdatePayload) {
+  return api.put<ApiResponse<ClinicalTask>>(`/api/admin/tasks/${taskId}`, payload)
+}
+
+export async function deleteTask(taskId: string) {
+  return api.delete<ApiResponse<null>>(`/api/admin/tasks/${taskId}`)
+}

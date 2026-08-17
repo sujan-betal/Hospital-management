@@ -23,6 +23,34 @@ class ReceptionistRepository {
         (json['data'] ?? payload) as Map<String, dynamic>);
   }
 
+  /// `GET /api/patient/{user_id}` — fetch a single patient record.
+  static Future<PatientRecord> getPatient(String userId) async {
+    final json = await ApiClient.instance.get('/api/patient/$userId');
+    return PatientRecord.fromApi(
+        (json['data'] ?? const <String, dynamic>{}) as Map<String, dynamic>);
+  }
+
+  /// `PUT /api/patient/{user_id}` — update a patient by the front desk.
+  static Future<PatientRecord> updatePatient(
+      String userId, Map<String, dynamic> payload) async {
+    final json = await ApiClient.instance.put('/api/patient/$userId', payload);
+    return PatientRecord.fromApi(
+        (json['data'] ?? payload) as Map<String, dynamic>);
+  }
+
+  /// `DELETE /api/patient/{user_id}` — remove a patient record.
+  static Future<void> deletePatient(String userId) =>
+      ApiClient.instance.delete('/api/patient/$userId');
+
+  // ---- Doctors (booking reference) ------------------------------------------
+
+  static Future<List<ReceptionistDoctor>> listDoctors() async {
+    final json = await ApiClient.instance.get('/api/receptionist/doctors');
+    return ((json['data'] ?? []) as List)
+        .map((e) => ReceptionistDoctor.fromApi(e as Map<String, dynamic>))
+        .toList();
+  }
+
   // ---- OPD appointments ------------------------------------------------
 
   static Future<List<Appointment>> listAppointments() async {
@@ -72,6 +100,9 @@ class ReceptionistRepository {
         .put('/api/receptionist/invoices/$invoiceId', payload);
     return Invoice.fromApi((json['data'] ?? payload) as Map<String, dynamic>);
   }
+
+  static Future<void> deleteInvoice(String invoiceId) =>
+      ApiClient.instance.delete('/api/receptionist/invoices/$invoiceId');
 
   // ---- Ward & beds --------------------------------------------------------
 

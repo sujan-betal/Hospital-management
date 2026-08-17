@@ -13,6 +13,13 @@ class DoctorRepository {
         (json['data'] ?? const <String, dynamic>{}) as Map<String, dynamic>);
   }
 
+  /// `GET /api/doctor/bank-details` → `{ data: DoctorBankDetails }`
+  static Future<DoctorBankDetails> getBankDetails() async {
+    final json = await ApiClient.instance.get('/api/doctor/bank-details');
+    return DoctorBankDetails.fromJson(
+        (json['data'] ?? const <String, dynamic>{}) as Map<String, dynamic>);
+  }
+
   /// `PUT /api/doctor/bank-details` → `{ data: DoctorBankDetails }`
   static Future<DoctorBankDetails> updateBankDetails(
     DoctorBankDetails payload,

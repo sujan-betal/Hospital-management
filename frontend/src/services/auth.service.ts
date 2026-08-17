@@ -90,6 +90,10 @@ export async function loginStaff(payload: LoginPayload) {
   return api.post<ApiResponse<AdminData>>("/api/admin/login", payload)
 }
 
+export async function loginDoctor(payload: LoginPayload) {
+  return api.post<ApiResponse<AdminData>>("/api/doctor/login", payload)
+}
+
 export async function registerAdmin(payload: RegisterPayload) {
   return api.post<ApiResponse<AdminData>>("/api/admin/register", payload)
 }
