@@ -55,13 +55,26 @@ class PatientScaffold extends StatelessWidget {
             ),
             body: Column(
               children: [
-                PatientNavbar(
-                  title: current.label,
-                  subtitle: 'Aura Medical Center patient portal console.',
-                  phone: userPhone,
-                  onMenuTap: () => scaffoldKey.currentState?.openDrawer(),
+                // Extend the navbar's white background behind the status bar /
+                // notch, and push its content below it so nothing gets clipped.
+                ColoredBox(
+                  color: PatientColors.surface,
+                  child: SafeArea(
+                    bottom: false,
+                    child: PatientNavbar(
+                      title: current.label,
+                      subtitle: 'Aura Medical Center patient portal console.',
+                      phone: userPhone,
+                      onMenuTap: () => scaffoldKey.currentState?.openDrawer(),
+                    ),
+                  ),
                 ),
-                Expanded(child: content),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+                    child: content,
+                  ),
+                ),
               ],
             ),
           );

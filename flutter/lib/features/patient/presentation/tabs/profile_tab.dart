@@ -83,17 +83,28 @@ class _ProfileTabState extends State<ProfileTab> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, c) {
-        final twoCol = c.maxWidth >= 900;
+        final wide = c.maxWidth >= 900;
+        if (!wide) {
+          // Phones: stack the two cards full-width, each sized to its content
+          // so the form fields + save button are never clipped.
+          return Column(
+            children: [
+              _overviewCard(),
+              const SizedBox(height: 18),
+              _editCard(),
+            ],
+          );
+        }
         return GridView.count(
-          crossAxisCount: twoCol ? 3 : 1,
+          crossAxisCount: 3,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           mainAxisSpacing: 18,
           crossAxisSpacing: 18,
-          childAspectRatio: twoCol ? 1.05 : 1.6,
+          childAspectRatio: 1.05,
           children: [
             _overviewCard(),
-            if (twoCol) const SizedBox.shrink(),
+            const SizedBox.shrink(),
             _editCard(),
           ],
         );

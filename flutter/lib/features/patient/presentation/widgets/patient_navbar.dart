@@ -51,89 +51,103 @@ class _PatientNavbarState extends State<PatientNavbar> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 76,
-      padding: const EdgeInsets.symmetric(horizontal: 28),
-      decoration: const BoxDecoration(
-        color: PatientColors.surface,
-        border: Border(bottom: BorderSide(color: PatientColors.border)),
-      ),
-      child: Row(
-        children: [
-          if (widget.onMenuTap != null) ...[
-            IconButton(
-              onPressed: widget.onMenuTap,
-              icon: const Icon(Icons.menu_rounded,
-                  color: PatientColors.textMid, size: 22),
-            ),
-            const SizedBox(width: 4),
-          ],
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(widget.title.toUpperCase(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        color: PatientColors.textStrong,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.4)),
-                const SizedBox(height: 3),
-                Text('Aura Medical Center patient portal console.',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        color: PatientColors.textBody, fontSize: 11)),
-              ],
-            ),
+    return LayoutBuilder(
+      builder: (context, c) {
+        final narrow = c.maxWidth < 640;
+        return Container(
+          height: 76,
+          padding: EdgeInsets.symmetric(horizontal: narrow ? 16 : 28),
+          decoration: const BoxDecoration(
+            color: PatientColors.surface,
+            border: Border(bottom: BorderSide(color: PatientColors.border)),
           ),
-          const SizedBox(width: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            decoration: BoxDecoration(
-              color: PatientColors.surfaceAlt,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: PatientColors.borderStrong),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.schedule_rounded,
-                    size: 15, color: PatientColors.primary),
-                const SizedBox(width: 7),
-                Text(_now,
-                    style: const TextStyle(
-                        color: PatientColors.primary,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600)),
+          child: Row(
+            children: [
+              if (widget.onMenuTap != null) ...[
+                IconButton(
+                  onPressed: widget.onMenuTap,
+                  icon: const Icon(Icons.menu_rounded,
+                      color: PatientColors.textMid, size: 22),
+                ),
+                if (!narrow) const SizedBox(width: 4),
               ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-            decoration: BoxDecoration(
-              color: PatientColors.surfaceAlt,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: PatientColors.borderStrong),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.smartphone_rounded,
-                    size: 14, color: PatientColors.primary),
-                const SizedBox(width: 7),
-                Text(widget.phone.isEmpty ? 'Logged in via OTP' : widget.phone,
-                    style: const TextStyle(
-                        color: PatientColors.primary,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700)),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(widget.title.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: PatientColors.textStrong,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.4)),
+                    const SizedBox(height: 3),
+                    Text('Aura Medical Center patient portal console.',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: PatientColors.textBody, fontSize: 11)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: PatientColors.surfaceAlt,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: PatientColors.borderStrong),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.schedule_rounded,
+                        size: 15, color: PatientColors.primary),
+                    if (!narrow) const SizedBox(width: 7),
+                    Text(_now,
+                        style: const TextStyle(
+                            color: PatientColors.primary,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+              // The phone badge is redundant on phones (the drawer sidebar
+              // already shows it) and its full number overflows narrow rows.
+              if (!narrow) ...[
+                const SizedBox(width: 10),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: PatientColors.surfaceAlt,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: PatientColors.borderStrong),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.smartphone_rounded,
+                          size: 14, color: PatientColors.primary),
+                      const SizedBox(width: 7),
+                      Text(
+                          widget.phone.isEmpty
+                              ? 'Logged in via OTP'
+                              : widget.phone,
+                          style: const TextStyle(
+                              color: PatientColors.primary,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
               ],
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

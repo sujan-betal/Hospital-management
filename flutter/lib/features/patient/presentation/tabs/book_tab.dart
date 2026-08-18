@@ -95,13 +95,35 @@ class _BookTabState extends State<BookTab> {
           LayoutBuilder(
             builder: (context, c) {
               final twoCol = c.maxWidth >= 900;
+              if (!twoCol) {
+                // Single column on phones: cards size to their content so the
+                // slot grid + footer never get clipped by a fixed aspect ratio.
+                return Column(
+                  children: [
+                    for (final doc in _filtered) ...[
+                      _DoctorCard(
+                        doctor: doc,
+                        slots: kPatientSlots,
+                        booked: _bookedByDoctor[doc.name] ?? const {},
+                        booking: _booking,
+                        onBook: (slot) async {
+                          setState(() => _booking = true);
+                          await widget.onBook(doc, slot);
+                          if (mounted) setState(() => _booking = false);
+                        },
+                      ),
+                      if (doc != _filtered.last) const SizedBox(height: 18),
+                    ],
+                  ],
+                );
+              }
               return GridView.count(
-                crossAxisCount: twoCol ? 2 : 1,
+                crossAxisCount: 2,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 mainAxisSpacing: 18,
                 crossAxisSpacing: 18,
-                childAspectRatio: twoCol ? 1.35 : 1.1,
+                childAspectRatio: 1.35,
                 children: [
                   for (final doc in _filtered)
                     _DoctorCard(
@@ -124,6 +146,68 @@ class _BookTabState extends State<BookTab> {
   }
 
   Widget _header() {
+    final pills = Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        PatientPill(
+          label: '${widget.doctors.length} Doctors',
+          soft: PatientColors.surfaceAlt,
+          text: PatientColors.primary,
+          line: PatientColors.borderStrong,
+        ),
+        PatientPill(
+          label: '$_topRatedCount Top Rated',
+          soft: PatientColors.amberSoft,
+          text: PatientColors.amberText,
+          line: PatientColors.amberLine,
+        ),
+        Material(
+          color: PatientColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          child: InkWell(
+            onTap: () => setState(() => _topRated = !_topRated),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: PatientColors.borderStrong),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.sort_rounded,
+                      size: 14, color: PatientColors.primary),
+                  const SizedBox(width: 5),
+                  Text(_topRated ? 'Top Rated' : 'Name A-Z',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: PatientColors.primary)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    final title = const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Book Consultation / Doctor Slot',
+            style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: PatientColors.textStrong)),
+        SizedBox(height: 4),
+        Text(
+            'Browse the hospital doctors by specialty & rating, then pick a slot',
+            style: TextStyle(fontSize: 12, color: PatientColors.textBody)),
+      ],
+    );
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -131,74 +215,27 @@ class _BookTabState extends State<BookTab> {
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: PatientColors.border),
       ),
-      child: Row(
-        children: [
-          const Expanded(
-            child: Column(
+      child: LayoutBuilder(
+        builder: (context, c) {
+          if (c.maxWidth < 700) {
+            // Stack title + pills on phones so the pills don't overflow.
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Book Consultation / Doctor Slot',
-                    style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: PatientColors.textStrong)),
-                SizedBox(height: 4),
-                Text(
-                    'Browse the hospital doctors by specialty & rating, then pick a slot',
-                    style:
-                        TextStyle(fontSize: 12, color: PatientColors.textBody)),
+                title,
+                const SizedBox(height: 14),
+                pills,
               ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            );
+          }
+          return Row(
             children: [
-              PatientPill(
-                label: '${widget.doctors.length} Doctors',
-                soft: PatientColors.surfaceAlt,
-                text: PatientColors.primary,
-                line: PatientColors.borderStrong,
-              ),
-              PatientPill(
-                label: '$_topRatedCount Top Rated',
-                soft: PatientColors.amberSoft,
-                text: PatientColors.amberText,
-                line: PatientColors.amberLine,
-              ),
-              Material(
-                color: PatientColors.surface,
-                borderRadius: BorderRadius.circular(12),
-                child: InkWell(
-                  onTap: () => setState(() => _topRated = !_topRated),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: PatientColors.borderStrong),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.sort_rounded,
-                            size: 14, color: PatientColors.primary),
-                        const SizedBox(width: 5),
-                        Text(_topRated ? 'Top Rated' : 'Name A-Z',
-                            style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: PatientColors.primary)),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+              Expanded(child: title),
+              const SizedBox(width: 12),
+              pills,
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }

@@ -271,65 +271,81 @@ class _AppointmentRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: PatientColors.emeraldSoft,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: PatientColors.emeraldLine),
-                ),
-                child: const Icon(Icons.medical_services_rounded,
-                    color: PatientColors.emeraldDark, size: 22),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(appointment.doctorName,
-                              style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: PatientColors.textStrong)),
+          LayoutBuilder(
+            builder: (context, c) {
+              final narrow = c.maxWidth < 420;
+              final info = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: PatientColors.emeraldSoft,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: PatientColors.emeraldLine),
                         ),
-                        const SizedBox(width: 8),
-                        Text(appointment.appointmentId,
-                            style: const TextStyle(
-                                fontSize: 10,
-                                fontFamily: 'monospace',
-                                color: PatientColors.textHint)),
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Text(appointment.specialty,
-                        style: const TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                            color: PatientColors.emeraldDark)),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.calendar_today_rounded,
-                            size: 12, color: PatientColors.textHint),
-                        const SizedBox(width: 4),
-                        Text('${appointment.date} · ${appointment.time}',
-                            style: const TextStyle(
-                                fontSize: 11.5, color: PatientColors.textBody)),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                        child: const Icon(Icons.medical_services_rounded,
+                            color: PatientColors.emeraldDark, size: 22),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(appointment.doctorName,
+                                      style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                          color: PatientColors.textStrong)),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(appointment.appointmentId,
+                                    style: const TextStyle(
+                                        fontSize: 10,
+                                        fontFamily: 'monospace',
+                                        color: PatientColors.textHint)),
+                              ],
+                            ),
+                            const SizedBox(height: 3),
+                            Text(appointment.specialty,
+                                style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: PatientColors.emeraldDark)),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(Icons.calendar_today_rounded,
+                                    size: 12, color: PatientColors.textHint),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                      '${appointment.date} · ${appointment.time}',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          fontSize: 11.5,
+                                          color: PatientColors.textBody)),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+
+              final pills = Column(
+                crossAxisAlignment: narrow
+                    ? CrossAxisAlignment.start
+                    : CrossAxisAlignment.end,
                 children: [
                   PatientPill(
                     label: appointment.status,
@@ -353,8 +369,29 @@ class _AppointmentRow extends StatelessWidget {
                         : PatientColors.amberLine,
                   ),
                 ],
-              ),
-            ],
+              );
+
+              if (narrow) {
+                // Stack the status pills below the appointment info on phones
+                // so nothing gets clipped on a narrow row.
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    info,
+                    const SizedBox(height: 10),
+                    pills,
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: info),
+                  const SizedBox(width: 8),
+                  pills,
+                ],
+              );
+            },
           ),
           if (isScheduled || isVisited) ...[
             const SizedBox(height: 12),
@@ -444,83 +481,111 @@ class _InvoiceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pill = PatientPill(
+      label: invoice.paymentStatus,
+      soft: invoice.isPaid ? PatientColors.emeraldSoft : PatientColors.roseSoft,
+      text: invoice.isPaid ? PatientColors.emeraldText : PatientColors.roseText,
+      line: invoice.isPaid ? PatientColors.emeraldLine : PatientColors.roseLine,
+    );
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: PatientColors.roseSoft,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: PatientColors.roseLine),
-            ),
-            child: const Icon(Icons.receipt_long_rounded,
-                color: PatientColors.rose, size: 22),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(invoice.invoiceId,
-                        style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: PatientColors.textStrong)),
-                    const SizedBox(width: 8),
-                    Text(invoice.date,
-                        style: const TextStyle(
-                            fontSize: 10.5,
-                            fontFamily: 'monospace',
-                            color: PatientColors.textHint)),
-                  ],
-                ),
-                if (invoice.items.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  for (final item in invoice.items)
-                    Row(
+      child: LayoutBuilder(
+        builder: (context, c) {
+          final narrow = c.maxWidth < 420;
+          final info = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: PatientColors.roseSoft,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: PatientColors.roseLine),
+                    ),
+                    child: const Icon(Icons.receipt_long_rounded,
+                        color: PatientColors.rose, size: 22),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(item.description,
-                              style: const TextStyle(
-                                  fontSize: 12, color: PatientColors.textBody)),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(invoice.invoiceId,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: PatientColors.textStrong)),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(invoice.date,
+                                style: const TextStyle(
+                                    fontSize: 10.5,
+                                    fontFamily: 'monospace',
+                                    color: PatientColors.textHint)),
+                          ],
                         ),
-                        Text('Rs. ${item.cost}',
+                        if (invoice.items.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          for (final item in invoice.items)
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(item.description,
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          color: PatientColors.textBody)),
+                                ),
+                                const SizedBox(width: 8),
+                                Text('Rs. ${item.cost}',
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: PatientColors.emeraldDark)),
+                              ],
+                            ),
+                        ],
+                        const SizedBox(height: 6),
+                        Text('Total: Rs. ${invoice.amount}',
                             style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: PatientColors.emeraldDark)),
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: PatientColors.textStrong)),
                       ],
                     ),
+                  ),
                 ],
-                const SizedBox(height: 6),
-                Text('Total: Rs. ${invoice.amount}',
-                    style: const TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                        color: PatientColors.textStrong)),
+              ),
+            ],
+          );
+
+          if (narrow) {
+            // Stack the payment pill below the invoice on phones.
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                info,
+                const SizedBox(height: 10),
+                pill,
               ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          PatientPill(
-            label: invoice.paymentStatus,
-            soft: invoice.isPaid
-                ? PatientColors.emeraldSoft
-                : PatientColors.roseSoft,
-            text: invoice.isPaid
-                ? PatientColors.emeraldText
-                : PatientColors.roseText,
-            line: invoice.isPaid
-                ? PatientColors.emeraldLine
-                : PatientColors.roseLine,
-          ),
-        ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: info),
+              const SizedBox(width: 8),
+              pill,
+            ],
+          );
+        },
       ),
     );
   }
