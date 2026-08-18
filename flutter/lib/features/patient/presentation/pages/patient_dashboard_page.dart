@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/api_client.dart';
+import '../../../../core/payment/razorpay_payment.dart';
 import '../../../../data/repositories/auth_repository.dart';
 import '../../data/patient_models.dart';
 import '../../data/patient_repository.dart';
@@ -151,68 +153,57 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
 
   // ---- Payment ---------------------------------------------------------------
 
+  /// Open the Razorpay checkout for the appointment's OPD fee, then confirm the
+  /// payment server-side — mirrors the web app's `handlePayNow` in
+  /// `frontend/src/app/(dashboard)/patient/page.tsx`.
   Future<void> _payNow(PatientAppointment appt) async {
     try {
-      final order = await PatientRepository.createPaymentOrder(appt.appointmentId);
+      final order =
+          await PatientRepository.createPaymentOrder(appt.appointmentId);
       if (!mounted) return;
-      await showPatientModal<void>(
-        context: context,
-        title: 'Consultation Fee Payment',
-        subtitle: 'Razorpay order created for ${appt.doctorName}',
-        icon: Icons.wallet_rounded,
-        iconBg: PatientColors.emeraldSoft,
-        iconColor: PatientColors.emeraldDark,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _orderRow('Order ID', order.orderId),
-            const SizedBox(height: 10),
-            _orderRow('Appointment', appt.appointmentId),
-            const SizedBox(height: 10),
-            _orderRow('Amount', 'Rs. ${order.amount} ${order.currency}'),
-            const SizedBox(height: 18),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: PatientColors.surfaceAlt,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: PatientColors.borderStrong),
-              ),
-              child: const Text(
-                'Complete the payment in the Razorpay checkout (opens in your browser). '
-                'Once verified, the fee status updates automatically.',
-                style: TextStyle(fontSize: 12, color: PatientColors.emeraldDark),
-              ),
-            ),
-          ],
-        ),
+
+      final result = await RazorpayPayment.open(
+        keyId: order.keyId,
+        orderId: order.orderId,
+        amount: order.amount,
+        currency: order.currency,
+        description: 'OPD Consultation – ${appt.doctorName}',
+        name: _profile.userName.isNotEmpty ? _profile.userName : _userName,
+        contact: _profile.phone,
+        email: _profile.email,
       );
+
+      // User dismissed the checkout without paying.
+      if (result == null || !mounted) return;
+
+      await PatientRepository.verifyPayment(appt.appointmentId, {
+        'razorpay_order_id': result.orderId,
+        'razorpay_payment_id': result.paymentId,
+        'razorpay_signature': result.signature,
+      });
+
+      if (!mounted) return;
+      setState(() {
+        _appointments = [
+          for (final a in _appointments)
+            if (a.appointmentId == appt.appointmentId)
+              a.copyWith(paymentStatus: 'PAID')
+            else
+              a,
+        ];
+      });
+      showPatientToast(
+        context,
+        'Payment successful! Your appointment is confirmed.',
+      );
+    } on ApiException catch (e) {
+      if (mounted) showPatientToast(context, e.message, error: true);
     } catch (e) {
-      if (mounted) showPatientToast(context, 'Could not start payment: $e', error: true);
+      if (mounted) {
+        showPatientToast(context, 'Could not complete payment: $e', error: true);
+      }
     }
   }
-
-  Widget _orderRow(String label, String value) => Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(label,
-                style: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: PatientColors.emeraldDark)),
-          ),
-          Expanded(
-            child: Text(value,
-                style: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                    color: PatientColors.textStrong)),
-          ),
-        ],
-      );
 
   // ---- Review ---------------------------------------------------------------
 
