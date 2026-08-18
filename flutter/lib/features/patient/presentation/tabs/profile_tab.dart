@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_theme.dart';
-import '../../../admin/presentation/admin_colors.dart';
-import '../../../admin/presentation/widgets/admin_common.dart';
 import '../../data/patient_models.dart';
+import '../patient_colors.dart';
+import '../widgets/patient_common.dart';
 
 /// "Profile Details" — patient overview card + editable registration form,
 /// backed by `GET/PUT /api/patient/me`.
@@ -106,9 +105,9 @@ class _ProfileTabState extends State<ProfileTab> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: AdminColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AdminColors.border),
+        color: PatientColors.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: PatientColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -121,13 +120,13 @@ class _ProfileTabState extends State<ProfileTab> {
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [AppColors.emerald, AdminColors.emerald700],
+                  colors: [PatientColors.emerald, PatientColors.emeraldDark],
                 ),
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 3),
                 boxShadow: [
                   BoxShadow(
-                      color: AppColors.emerald.withValues(alpha: 0.25),
+                      color: PatientColors.emerald.withValues(alpha: 0.25),
                       blurRadius: 18,
                       offset: const Offset(0, 6)),
                 ],
@@ -148,21 +147,21 @@ class _ProfileTabState extends State<ProfileTab> {
               style: const TextStyle(
                   fontSize: 19,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textDark),
+                  color: PatientColors.textStrong),
             ),
           ),
           const SizedBox(height: 3),
           const Center(
             child: Text('Aura Medical Center · Patient Portal',
-                style: TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
+                style: TextStyle(fontSize: 11.5, color: PatientColors.textMuted)),
           ),
           const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AdminColors.bgSubtle,
+              color: PatientColors.surfaceAlt,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AdminColors.borderLight),
+              border: Border.all(color: PatientColors.borderStrong),
             ),
             child: Column(
               children: [
@@ -199,7 +198,7 @@ class _ProfileTabState extends State<ProfileTab> {
               style: const TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textMuted)),
+                  color: PatientColors.textMuted)),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -209,8 +208,9 @@ class _ProfileTabState extends State<ProfileTab> {
               style: TextStyle(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w700,
-                  color:
-                      accent ? AdminColors.emerald600 : AppColors.textDark)),
+                  color: accent
+                      ? PatientColors.emeraldDark
+                      : PatientColors.textStrong)),
         ),
       ],
     );
@@ -220,9 +220,9 @@ class _ProfileTabState extends State<ProfileTab> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: AdminColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AdminColors.border),
+        color: PatientColors.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: PatientColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,11 +231,11 @@ class _ProfileTabState extends State<ProfileTab> {
               style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textDark)),
+                  color: PatientColors.textStrong)),
           const SizedBox(height: 4),
           const Text(
               'These details are stored in the hospital database and shared with your care team.',
-              style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+              style: TextStyle(fontSize: 12, color: PatientColors.textMuted)),
           const SizedBox(height: 20),
           _field('Full Name', _name),
           const SizedBox(height: 14),
@@ -251,10 +251,11 @@ class _ProfileTabState extends State<ProfileTab> {
           const SizedBox(height: 20),
           Align(
             alignment: Alignment.centerRight,
-            child: AdminButton(
+            child: PatientPrimaryButton(
               label: _saving ? 'Saving…' : 'Update Details',
               icon: Icons.save_rounded,
-              onPressed: _saving ? null : _save,
+              loading: _saving,
+              onPressed: _saving ? () {} : _save,
             ),
           ),
         ],
@@ -264,17 +265,43 @@ class _ProfileTabState extends State<ProfileTab> {
 
   Widget _field(String label, TextEditingController controller,
       {TextInputType? keyboard}) {
-    return ModalField(
-      label: label,
-      field: TextField(
-        controller: controller,
-        keyboardType: keyboard,
-        style: const TextStyle(fontSize: 14),
-        decoration:
-            InputDecoration(hintText: label, border: modalFieldBorder()),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: PatientColors.primary)),
+        const SizedBox(height: 6),
+        TextField(
+          controller: controller,
+          keyboardType: keyboard,
+          style: const TextStyle(fontSize: 14, color: PatientColors.textStrong),
+          decoration: InputDecoration(
+            hintText: label,
+            hintStyle:
+                const TextStyle(fontSize: 13, color: PatientColors.textHint),
+            filled: true,
+            fillColor: PatientColors.surfaceDeep,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            border: _fieldBorder(),
+            enabledBorder: _fieldBorder(),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: PatientColors.primary),
+            ),
+          ),
+        ),
+      ],
     );
   }
+
+  OutlineInputBorder _fieldBorder() => OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: PatientColors.borderStrong),
+      );
 
   Widget _genderField() {
     return Column(
@@ -284,14 +311,14 @@ class _ProfileTabState extends State<ProfileTab> {
             style: TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textMid)),
+                color: PatientColors.primary)),
         const SizedBox(height: 6),
         Wrap(
           spacing: 8,
           children: [
             for (final g in ['Male', 'Female', 'Other'])
               Material(
-                color: _gender == g ? AdminColors.emerald600 : AdminColors.bgSoft,
+                color: _gender == g ? PatientColors.emerald : PatientColors.surfaceDeep,
                 borderRadius: BorderRadius.circular(10),
                 child: InkWell(
                   onTap: () => setState(() => _gender = g),
@@ -303,15 +330,16 @@ class _ProfileTabState extends State<ProfileTab> {
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                           color: _gender == g
-                              ? AdminColors.emerald600
-                              : AdminColors.borderLight),
+                              ? PatientColors.emerald
+                              : PatientColors.borderStrong),
                     ),
                     child: Text(g,
                         style: TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w700,
-                            color:
-                                _gender == g ? Colors.white : AppColors.textBody)),
+                            color: _gender == g
+                                ? Colors.white
+                                : PatientColors.textBody)),
                   ),
                 ),
               ),

@@ -314,6 +314,45 @@ class PatientStars extends StatelessWidget {
   }
 }
 
+/// Empty-state column used inside patient section cards.
+class PatientEmpty extends StatelessWidget {
+  const PatientEmpty({
+    super.key,
+    required this.message,
+    this.icon = Icons.inbox_outlined,
+  });
+
+  final String message;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+      child: Column(
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: PatientColors.surfaceAlt,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Icon(icon, size: 30, color: PatientColors.textHint),
+          ),
+          const SizedBox(height: 12),
+          Text(message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  color: PatientColors.textMuted,
+                  fontSize: 12.5,
+                  height: 1.5)),
+        ],
+      ),
+    );
+  }
+}
+
 /// Floating snack-bar helper for success/error notices.
 void showPatientToast(BuildContext context, String message,
     {bool error = false}) {

@@ -11,11 +11,13 @@ class PatientNavbar extends StatefulWidget {
     required this.title,
     required this.subtitle,
     required this.phone,
+    this.onMenuTap,
   });
 
   final String title;
   final String subtitle;
   final String phone;
+  final VoidCallback? onMenuTap;
 
   @override
   State<PatientNavbar> createState() => _PatientNavbarState();
@@ -58,6 +60,14 @@ class _PatientNavbarState extends State<PatientNavbar> {
       ),
       child: Row(
         children: [
+          if (widget.onMenuTap != null) ...[
+            IconButton(
+              onPressed: widget.onMenuTap,
+              icon: const Icon(Icons.menu_rounded,
+                  color: PatientColors.textMid, size: 22),
+            ),
+            const SizedBox(width: 4),
+          ],
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../data/patient_models.dart';
 import '../patient_colors.dart';
 import '../tabs/book_tab.dart';
 import 'patient_common.dart';

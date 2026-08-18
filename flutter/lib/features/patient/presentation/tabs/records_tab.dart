@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_theme.dart';
-import '../../../admin/presentation/admin_colors.dart';
-import '../../../admin/presentation/widgets/admin_common.dart';
 import '../../data/patient_models.dart';
+import '../patient_colors.dart';
+import '../widgets/patient_common.dart';
+import '../widgets/patient_modals.dart';
 
 /// "My Appointments & Bills" — metrics, appointment timeline with reschedule /
 /// pay / review actions, and the invoice ledger. All rows come from the
@@ -15,6 +15,8 @@ class RecordsTab extends StatefulWidget {
     required this.appointments,
     required this.invoices,
     required this.reviews,
+    required this.today,
+    required this.bookedSlots,
     required this.onReschedule,
     required this.onPayNow,
     required this.onSubmitReview,
@@ -25,10 +27,12 @@ class RecordsTab extends StatefulWidget {
   final List<PatientAppointment> appointments;
   final List<PatientInvoice> invoices;
   final List<PatientReview> reviews;
-  final Future<void> Function(
+  final String today;
+  final List<BookedSlot> bookedSlots;
+  final Future<bool> Function(
       PatientAppointment appt, String date, String time) onReschedule;
   final Future<void> Function(PatientAppointment appt) onPayNow;
-  final Future<void> Function(
+  final Future<bool> Function(
       PatientAppointment appt, int rating, String comment) onSubmitReview;
   final VoidCallback onBookNew;
 
@@ -48,139 +52,62 @@ class _RecordsTabState extends State<RecordsTab> {
   Set<String> get _reviewedIds =>
       widget.reviews.map((r) => r.appointmentId).toSet();
 
+  Set<String> _doctorBookedTimes(String doctorName) => {
+        for (final s in widget.bookedSlots)
+          if (s.doctorName == doctorName) s.time,
+      };
+
   Future<void> _openReschedule(PatientAppointment appt) async {
-    final dateCtrl = TextEditingController(text: appt.date);
-    final timeCtrl = TextEditingController(text: appt.time);
-    final ok = await showAdminModal<bool>(
-      context,
+    var saving = false;
+    await showPatientModal<void>(
+      context: context,
       title: 'Reschedule Appointment',
       subtitle: 'Pick a new date & time with ${appt.doctorName}',
+      icon: Icons.edit_calendar_rounded,
+      iconBg: PatientColors.emeraldSoft,
+      iconColor: PatientColors.emeraldDark,
       child: StatefulBuilder(
-        builder: (context, setModalState) {
-          Future<void> pickDate() async {
-            final now = DateTime.now();
-            final picked = await showDatePicker(
-              context: context,
-              initialDate: DateTime.tryParse(appt.date) ?? now,
-              firstDate: now.subtract(const Duration(days: 1)),
-              lastDate: now.add(const Duration(days: 365)),
-            );
-            if (picked != null) {
-              setModalState(() => dateCtrl.text = _fmtDate(picked));
-            }
-          }
-
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              ModalField(
-                label: 'Date *',
-                field: TextField(
-                  controller: dateCtrl,
-                  readOnly: true,
-                  onTap: pickDate,
-                  style: const TextStyle(fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: 'YYYY-MM-DD',
-                    suffixIcon: const Icon(Icons.calendar_today_rounded, size: 16),
-                    border: modalFieldBorder(),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              ModalField(
-                label: 'Time *',
-                field: TextField(
-                  controller: timeCtrl,
-                  style: const TextStyle(fontSize: 14),
-                  decoration: InputDecoration(
-                      hintText: '10:30 AM', border: modalFieldBorder()),
-                ),
-              ),
-              const SizedBox(height: 20),
-              AdminButton(
-                label: 'Save New Timing',
-                icon: Icons.check_rounded,
-                onPressed: () async {
-                  if (dateCtrl.text.trim().isEmpty || timeCtrl.text.trim().isEmpty) {
-                    showAdminToast(context, 'Please choose a date and a time');
-                    return;
-                  }
-                  Navigator.of(context).pop(true);
-                  await widget.onReschedule(
-                      appt, dateCtrl.text.trim(), timeCtrl.text.trim());
-                },
-              ),
-            ],
-          );
-        },
-      ),
-    );
-    if (ok == true && mounted) {}
-  }
-
-  String _fmtDate(DateTime d) {
-    final m = d.month.toString().padLeft(2, '0');
-    final day = d.day.toString().padLeft(2, '0');
-    return '${d.year}-$m-$day';
-  }
-
-  Future<void> _openReview(PatientAppointment appt) async {
-    var rating = 0;
-    final commentCtrl = TextEditingController();
-    final ok = await showAdminModal<bool>(
-      context,
-      title: 'Rate Your Doctor',
-      subtitle: 'How was your visit with ${appt.doctorName}?',
-      child: StatefulBuilder(
-        builder: (context, setModalState) => Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(5, (i) {
-                return IconButton(
-                  onPressed: () => setModalState(() => rating = i + 1),
-                  icon: Icon(
-                    i < rating ? Icons.star_rounded : Icons.star_border_rounded,
-                    size: 30,
-                    color: i < rating ? const Color(0xFFFBBF24) : AdminColors.borderLight,
-                  ),
-                );
-              }),
-            ),
-            const SizedBox(height: 8),
-            ModalField(
-              label: 'Comment (optional)',
-              field: TextField(
-                controller: commentCtrl,
-                maxLines: 3,
-                style: const TextStyle(fontSize: 14),
-                decoration: InputDecoration(
-                    hintText: 'Share your experience…', border: modalFieldBorder()),
-              ),
-            ),
-            const SizedBox(height: 20),
-            AdminButton(
-              label: 'Submit Review',
-              icon: Icons.send_rounded,
-              onPressed: () async {
-                if (rating < 1) {
-                  showAdminToast(context, 'Please select a star rating');
-                  return;
-                }
-                Navigator.of(context).pop(true);
-                await widget.onSubmitReview(
-                    appt, rating, commentCtrl.text.trim());
-              },
-            ),
-          ],
+        builder: (context, setModalState) => RescheduleModalBody(
+          doctorName: appt.doctorName,
+          initialDate: appt.date,
+          initialTime: appt.time,
+          today: widget.today,
+          bookedTimes: _doctorBookedTimes(appt.doctorName),
+          saving: saving,
+          onSave: (date, time) async {
+            setModalState(() => saving = true);
+            final ok = await widget.onReschedule(appt, date, time);
+            if (mounted) setModalState(() => saving = false);
+            return ok;
+          },
         ),
       ),
     );
-    if (ok == true && mounted) {}
+  }
+
+  Future<void> _openReview(PatientAppointment appt) async {
+    var submitting = false;
+    await showPatientModal<void>(
+      context: context,
+      title: 'Rate Your Doctor',
+      subtitle: 'How was your visit with ${appt.doctorName}?',
+      icon: Icons.star_rounded,
+      iconBg: PatientColors.amberSoft,
+      iconColor: PatientColors.amberText,
+      child: StatefulBuilder(
+        builder: (context, setModalState) => RateDoctorModalBody(
+          doctorName: appt.doctorName,
+          specialty: appt.specialty,
+          submitting: submitting,
+          onSubmit: (rating, comment) async {
+            setModalState(() => submitting = true);
+            final ok = await widget.onSubmitReview(appt, rating, comment);
+            if (mounted) setModalState(() => submitting = false);
+            return ok;
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -198,29 +125,6 @@ class _RecordsTabState extends State<RecordsTab> {
   }
 
   Widget _metrics() {
-    final cards = [
-      (
-        label: 'Upcoming Appointments',
-        value: '$_upcoming',
-        icon: Icons.calendar_month_rounded,
-        bg: AdminColors.bgSubtle,
-        fg: AdminColors.emerald600,
-      ),
-      (
-        label: 'Total Bills',
-        value: '${widget.invoices.length}',
-        icon: Icons.science_rounded,
-        bg: AdminColors.blue50,
-        fg: AdminColors.blue,
-      ),
-      (
-        label: 'Outstanding Balance',
-        value: 'Rs. $_outstanding',
-        icon: Icons.credit_card_rounded,
-        bg: AdminColors.rose50,
-        fg: AdminColors.rose,
-      ),
-    ];
     return LayoutBuilder(
       builder: (context, c) {
         final columns = c.maxWidth >= 800 ? 3 : 1;
@@ -230,51 +134,29 @@ class _RecordsTabState extends State<RecordsTab> {
           physics: const NeverScrollableScrollPhysics(),
           mainAxisSpacing: 14,
           crossAxisSpacing: 14,
-          childAspectRatio: columns == 1 ? 3.2 : 2.4,
+          childAspectRatio: columns == 1 ? 3.4 : 2.2,
           children: [
-            for (final card in cards)
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: AdminColors.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AdminColors.border),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: card.bg,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(card.icon, size: 21, color: card.fg),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(card.label.toUpperCase(),
-                              style: const TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.6,
-                                  color: AppColors.textMuted)),
-                          const SizedBox(height: 5),
-                          Text(card.value,
-                              style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppColors.textDark)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            PatientStatCard(
+              label: 'Upcoming Appointments',
+              value: '$_upcoming',
+              icon: Icons.calendar_month_rounded,
+              accent: PatientColors.emerald,
+              soft: PatientColors.emeraldSoft,
+            ),
+            PatientStatCard(
+              label: 'Total Bills',
+              value: '${widget.invoices.length}',
+              icon: Icons.science_rounded,
+              accent: PatientColors.blue,
+              soft: PatientColors.blueSoft,
+            ),
+            PatientStatCard(
+              label: 'Outstanding Balance',
+              value: 'Rs. $_outstanding',
+              icon: Icons.credit_card_rounded,
+              accent: PatientColors.rose,
+              soft: PatientColors.roseSoft,
+            ),
           ],
         );
       },
@@ -282,68 +164,38 @@ class _RecordsTabState extends State<RecordsTab> {
   }
 
   Widget _appointmentsCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AdminColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AdminColors.border),
+    return PatientSectionCard(
+      title: 'My Appointments',
+      subtitle: 'Every consultation booked through the portal or front desk',
+      action: PatientOutlineButton(
+        label: 'Book new',
+        icon: Icons.add_rounded,
+        compact: true,
+        onPressed: widget.onBookNew,
       ),
+      noPadding: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('My Appointments',
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textDark)),
-                      SizedBox(height: 3),
-                      Text(
-                          'Every consultation booked through the portal or front desk',
-                          style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
-                    ],
-                  ),
-                ),
-                OutlinedButton.icon(
-                  onPressed: widget.onBookNew,
-                  icon: const Icon(Icons.add_rounded, size: 16),
-                  label: const Text('Book new',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.emeraldDark,
-                    side: BorderSide(color: AdminColors.borderLight),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1, color: AdminColors.border),
+          const Divider(height: 1, color: PatientColors.border),
           if (widget.appointments.isEmpty)
-            const AdminEmpty(
-              message: 'No appointments yet. Book a slot with a doctor.',
+            const PatientEmpty(
+              message:
+                  'No appointments yet. Book a slot with a doctor from the Book Appointment tab.',
               icon: Icons.event_available_rounded,
             )
           else
             for (var i = 0; i < widget.appointments.length; i++) ...[
               _AppointmentRow(
                 appointment: widget.appointments[i],
-                reviewed: _reviewedIds.contains(widget.appointments[i].appointmentId),
+                reviewed:
+                    _reviewedIds.contains(widget.appointments[i].appointmentId),
                 onReschedule: _openReschedule,
                 onPayNow: widget.onPayNow,
                 onReview: _openReview,
               ),
               if (i != widget.appointments.length - 1)
-                const Divider(height: 1, color: AdminColors.border),
+                const Divider(height: 1, color: PatientColors.border),
             ],
         ],
       ),
@@ -351,42 +203,25 @@ class _RecordsTabState extends State<RecordsTab> {
   }
 
   Widget _invoicesCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AdminColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AdminColors.border),
-      ),
+    return PatientSectionCard(
+      title: 'Bills & Invoices',
+      subtitle: 'Invoices raised against your visits at the billing desk',
+      noPadding: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Bills & Invoices',
-                    style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textDark)),
-                SizedBox(height: 3),
-                Text('Invoices raised against your visits at the billing desk',
-                    style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
-              ],
-            ),
-          ),
-          const Divider(height: 1, color: AdminColors.border),
+          const Divider(height: 1, color: PatientColors.border),
           if (widget.invoices.isEmpty)
-            const AdminEmpty(
-              message: 'No bills yet. Any invoice created at the front desk will appear here.',
+            const PatientEmpty(
+              message:
+                  'No bills yet. Any invoice created at the front desk will appear here.',
               icon: Icons.credit_card_rounded,
             )
           else
             for (var i = 0; i < widget.invoices.length; i++) ...[
               _InvoiceRow(invoice: widget.invoices[i]),
               if (i != widget.invoices.length - 1)
-                const Divider(height: 1, color: AdminColors.border),
+                const Divider(height: 1, color: PatientColors.border),
             ],
         ],
       ),
@@ -409,22 +244,27 @@ class _AppointmentRow extends StatelessWidget {
   final ValueChanged<PatientAppointment> onPayNow;
   final ValueChanged<PatientAppointment> onReview;
 
-  (Color, Color) get _statusColors {
+  (Color, Color, Color) get _statusColors {
     switch (appointment.status.toUpperCase()) {
       case 'COMPLETED':
-        return (AdminColors.blue50, AdminColors.blue);
+        return (PatientColors.blueSoft, PatientColors.blueText, PatientColors.blueLine);
       case 'CANCELLED':
-        return (AdminColors.rose50, AdminColors.rose);
+        return (PatientColors.roseSoft, PatientColors.roseText, PatientColors.roseLine);
       default:
-        return (AdminColors.teal50, AdminColors.teal);
+        return (
+          PatientColors.emeraldSoft,
+          PatientColors.emeraldText,
+          PatientColors.emeraldLine
+        );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final (statusBg, statusFg) = _statusColors;
+    final (statusSoft, statusText, statusLine) = _statusColors;
     final isScheduled = appointment.status.toUpperCase() == 'SCHEDULED';
-    final isVisited = ['CHECKED-IN', 'COMPLETED'].contains(appointment.status.toUpperCase());
+    final isVisited =
+        ['CHECKED-IN', 'COMPLETED'].contains(appointment.status.toUpperCase());
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -438,11 +278,12 @@ class _AppointmentRow extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: AdminColors.bgSubtle,
+                  color: PatientColors.emeraldSoft,
                   borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: PatientColors.emeraldLine),
                 ),
                 child: const Icon(Icons.medical_services_rounded,
-                    color: AdminColors.emerald600, size: 22),
+                    color: PatientColors.emeraldDark, size: 22),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -456,14 +297,14 @@ class _AppointmentRow extends StatelessWidget {
                               style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
-                                  color: AppColors.textDark)),
+                                  color: PatientColors.textStrong)),
                         ),
                         const SizedBox(width: 8),
                         Text(appointment.appointmentId,
                             style: const TextStyle(
                                 fontSize: 10,
                                 fontFamily: 'monospace',
-                                color: AppColors.textHint)),
+                                color: PatientColors.textHint)),
                       ],
                     ),
                     const SizedBox(height: 3),
@@ -471,16 +312,16 @@ class _AppointmentRow extends StatelessWidget {
                         style: const TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.emeraldDark)),
+                            color: PatientColors.emeraldDark)),
                     const SizedBox(height: 4),
                     Row(
                       children: [
                         const Icon(Icons.calendar_today_rounded,
-                            size: 12, color: AppColors.textHint),
+                            size: 12, color: PatientColors.textHint),
                         const SizedBox(width: 4),
                         Text('${appointment.date} · ${appointment.time}',
                             style: const TextStyle(
-                                fontSize: 11.5, color: AppColors.textBody)),
+                                fontSize: 11.5, color: PatientColors.textBody)),
                       ],
                     ),
                   ],
@@ -490,25 +331,33 @@ class _AppointmentRow extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Pill(label: appointment.status, bg: statusBg, fg: statusFg),
+                  PatientPill(
+                    label: appointment.status,
+                    soft: statusSoft,
+                    text: statusText,
+                    line: statusLine,
+                  ),
                   const SizedBox(height: 6),
-                  Pill(
+                  PatientPill(
                     label: appointment.isPaid
                         ? 'Fee: Rs. ${appointment.fee} · PAID'
                         : 'Fee: Rs. ${appointment.fee} · ${appointment.paymentStatus}',
-                    bg: appointment.isPaid
-                        ? AdminColors.teal50
-                        : AdminColors.amber50,
-                    fg: appointment.isPaid
-                        ? AdminColors.teal
-                        : AdminColors.darkAmber,
+                    soft: appointment.isPaid
+                        ? PatientColors.emeraldSoft
+                        : PatientColors.amberSoft,
+                    text: appointment.isPaid
+                        ? PatientColors.emeraldText
+                        : PatientColors.amberText,
+                    line: appointment.isPaid
+                        ? PatientColors.emeraldLine
+                        : PatientColors.amberLine,
                   ),
                 ],
               ),
             ],
           ),
           if (isScheduled || isVisited) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -517,15 +366,15 @@ class _AppointmentRow extends StatelessWidget {
                   _actionChip(
                     icon: Icons.edit_calendar_rounded,
                     label: 'Edit Timing',
-                    bg: AdminColors.bgSoft,
-                    fg: AppColors.emeraldDark,
+                    bg: PatientColors.surfaceAlt,
+                    fg: PatientColors.primary,
                     onTap: () => onReschedule(appointment),
                   ),
                   if (!appointment.isPaid)
                     _actionChip(
                       icon: Icons.wallet_rounded,
                       label: 'Pay Now',
-                      bg: AppColors.emeraldDark,
+                      bg: PatientColors.primary,
                       fg: Colors.white,
                       onTap: () => onPayNow(appointment),
                     ),
@@ -535,16 +384,16 @@ class _AppointmentRow extends StatelessWidget {
                     _actionChip(
                       icon: Icons.check_circle_rounded,
                       label: 'Reviewed',
-                      bg: AdminColors.teal50,
-                      fg: AdminColors.teal,
+                      bg: PatientColors.emeraldSoft,
+                      fg: PatientColors.emeraldText,
                       onTap: null,
                     )
                   else
                     _actionChip(
                       icon: Icons.star_rounded,
                       label: 'Rate Doctor',
-                      bg: AdminColors.amber50,
-                      fg: AdminColors.darkAmber,
+                      bg: PatientColors.amberSoft,
+                      fg: PatientColors.amberText,
                       onTap: () => onReview(appointment),
                     ),
               ],
@@ -604,11 +453,12 @@ class _InvoiceRow extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: AdminColors.rose50,
+              color: PatientColors.roseSoft,
               borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: PatientColors.roseLine),
             ),
             child: const Icon(Icons.receipt_long_rounded,
-                color: AdminColors.rose, size: 22),
+                color: PatientColors.rose, size: 22),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -621,13 +471,13 @@ class _InvoiceRow extends StatelessWidget {
                         style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.textDark)),
+                            color: PatientColors.textStrong)),
                     const SizedBox(width: 8),
                     Text(invoice.date,
                         style: const TextStyle(
                             fontSize: 10.5,
                             fontFamily: 'monospace',
-                            color: AppColors.textHint)),
+                            color: PatientColors.textHint)),
                   ],
                 ),
                 if (invoice.items.isNotEmpty) ...[
@@ -638,13 +488,13 @@ class _InvoiceRow extends StatelessWidget {
                         Expanded(
                           child: Text(item.description,
                               style: const TextStyle(
-                                  fontSize: 12, color: AppColors.textBody)),
+                                  fontSize: 12, color: PatientColors.textBody)),
                         ),
                         Text('Rs. ${item.cost}',
                             style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: AppColors.emeraldDark)),
+                                color: PatientColors.emeraldDark)),
                       ],
                     ),
                 ],
@@ -653,15 +503,22 @@ class _InvoiceRow extends StatelessWidget {
                     style: const TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textDark)),
+                        color: PatientColors.textStrong)),
               ],
             ),
           ),
           const SizedBox(width: 8),
-          Pill(
+          PatientPill(
             label: invoice.paymentStatus,
-            bg: invoice.isPaid ? AdminColors.teal50 : AdminColors.rose50,
-            fg: invoice.isPaid ? AdminColors.teal : AdminColors.rose,
+            soft: invoice.isPaid
+                ? PatientColors.emeraldSoft
+                : PatientColors.roseSoft,
+            text: invoice.isPaid
+                ? PatientColors.emeraldText
+                : PatientColors.roseText,
+            line: invoice.isPaid
+                ? PatientColors.emeraldLine
+                : PatientColors.roseLine,
           ),
         ],
       ),

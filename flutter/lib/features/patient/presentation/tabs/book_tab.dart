@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_theme.dart';
-import '../../../admin/presentation/admin_colors.dart';
-import '../../../admin/presentation/widgets/admin_common.dart';
 import '../../data/patient_models.dart';
+import '../patient_colors.dart';
+import '../widgets/patient_common.dart';
 
 const List<String> kPatientSlots = [
   '09:30 AM',
@@ -87,8 +86,9 @@ class _BookTabState extends State<BookTab> {
         _filterChips(),
         const SizedBox(height: 16),
         if (_filtered.isEmpty)
-          const AdminEmpty(
-            message: 'No doctors available right now. The hospital has not added any active doctors yet.',
+          const PatientEmpty(
+            message:
+                'No doctors available right now. The hospital has not added any active doctors yet.',
             icon: Icons.medical_services_rounded,
           )
         else
@@ -127,9 +127,9 @@ class _BookTabState extends State<BookTab> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AdminColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AdminColors.border),
+        color: PatientColors.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: PatientColors.border),
       ),
       child: Row(
         children: [
@@ -140,12 +140,13 @@ class _BookTabState extends State<BookTab> {
                 Text('Book Consultation / Doctor Slot',
                     style: TextStyle(
                         fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textDark)),
+                        fontWeight: FontWeight.w800,
+                        color: PatientColors.textStrong)),
                 SizedBox(height: 4),
                 Text(
                     'Browse the hospital doctors by specialty & rating, then pick a slot',
-                    style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                    style:
+                        TextStyle(fontSize: 12, color: PatientColors.textBody)),
               ],
             ),
           ),
@@ -154,42 +155,42 @@ class _BookTabState extends State<BookTab> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              Pill(
+              PatientPill(
                 label: '${widget.doctors.length} Doctors',
-                bg: AdminColors.bgSoft,
-                fg: AppColors.emeraldDark,
-                icon: Icons.people_rounded,
+                soft: PatientColors.surfaceAlt,
+                text: PatientColors.primary,
+                line: PatientColors.borderStrong,
               ),
-              Pill(
+              PatientPill(
                 label: '$_topRatedCount Top Rated',
-                bg: AdminColors.amber50,
-                fg: AdminColors.darkAmber,
-                icon: Icons.workspace_premium_rounded,
+                soft: PatientColors.amberSoft,
+                text: PatientColors.amberText,
+                line: PatientColors.amberLine,
               ),
               Material(
-                color: AdminColors.surface,
-                borderRadius: BorderRadius.circular(10),
+                color: PatientColors.surface,
+                borderRadius: BorderRadius.circular(12),
                 child: InkWell(
                   onTap: () => setState(() => _topRated = !_topRated),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(12),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AdminColors.borderLight),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: PatientColors.borderStrong),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(Icons.sort_rounded,
-                            size: 14, color: AppColors.emeraldDark),
+                            size: 14, color: PatientColors.primary),
                         const SizedBox(width: 5),
                         Text(_topRated ? 'Top Rated' : 'Name A-Z',
                             style: const TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
-                                color: AppColors.emeraldDark)),
+                                color: PatientColors.primary)),
                       ],
                     ),
                   ),
@@ -225,7 +226,7 @@ class _BookTabState extends State<BookTab> {
 
   Widget _chip({required String label, required bool selected, required VoidCallback onTap}) {
     return Material(
-      color: selected ? AdminColors.emerald600 : AdminColors.surface,
+      color: selected ? PatientColors.emerald : PatientColors.surface,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
@@ -235,13 +236,15 @@ class _BookTabState extends State<BookTab> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-                color: selected ? AdminColors.emerald600 : AdminColors.borderLight),
+                color:
+                    selected ? PatientColors.emerald : PatientColors.borderStrong),
           ),
           child: Text(label,
               style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  color: selected ? Colors.white : AppColors.textBody)),
+                  color:
+                      selected ? Colors.white : PatientColors.textBody)),
         ),
       ),
     );
@@ -268,9 +271,9 @@ class _DoctorCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AdminColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AdminColors.border),
+        color: PatientColors.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: PatientColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -282,16 +285,16 @@ class _DoctorCard extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: AdminColors.bgSubtle,
+                  color: PatientColors.surfaceAlt,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AdminColors.borderLight),
+                  border: Border.all(color: PatientColors.borderStrong),
                 ),
                 alignment: Alignment.center,
                 child: Text(doctor.initials,
                     style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w800,
-                        color: AdminColors.emerald700)),
+                        color: PatientColors.emeraldDark)),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -305,12 +308,12 @@ class _DoctorCard extends StatelessWidget {
                               style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
-                                  color: AppColors.textDark)),
+                                  color: PatientColors.textStrong)),
                         ),
                         if (doctor.isTopRated) ...[
                           const SizedBox(width: 8),
                           const Icon(Icons.workspace_premium_rounded,
-                              size: 15, color: Color(0xFFF59E0B)),
+                              size: 15, color: PatientColors.amber),
                         ],
                       ],
                     ),
@@ -319,44 +322,35 @@ class _DoctorCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AdminColors.bgSubtle,
+                        color: PatientColors.emeraldSoft,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(doctor.specialty,
                           style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: AdminColors.emerald700)),
+                              color: PatientColors.emeraldDark)),
                     ),
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        for (var i = 0; i < 5; i++)
-                          Icon(
-                            i < doctor.rating.round()
-                                ? Icons.star_rounded
-                                : Icons.star_border_rounded,
-                            size: 13,
-                            color: i < doctor.rating.round()
-                                ? const Color(0xFFFBBF24)
-                                : AdminColors.borderLight,
-                          ),
+                        PatientStars(rating: doctor.rating.toDouble(), size: 13),
                         const SizedBox(width: 5),
                         Text(doctor.rating.toStringAsFixed(1),
                             style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
-                                color: AppColors.textDark)),
+                                color: PatientColors.textStrong)),
                         Text(' · ${doctor.reviewCount} reviews',
                             style: const TextStyle(
-                                fontSize: 10.5, color: AppColors.textMuted)),
+                                fontSize: 10.5, color: PatientColors.textMuted)),
                       ],
                     ),
                     if (doctor.experienceYears != null) ...[
                       const SizedBox(height: 3),
                       Text('${doctor.experienceYears}+ years experience',
                           style: const TextStyle(
-                              fontSize: 10.5, color: AppColors.textHint)),
+                              fontSize: 10.5, color: PatientColors.textHint)),
                     ],
                   ],
                 ),
@@ -369,7 +363,7 @@ class _DoctorCard extends StatelessWidget {
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.8,
-                  color: AppColors.textMuted)),
+                  color: PatientColors.textMuted)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -385,18 +379,18 @@ class _DoctorCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          const Divider(height: 1, color: AdminColors.border),
+          const Divider(height: 1, color: PatientColors.border),
           const SizedBox(height: 12),
           Row(
             children: [
               const Text('OPD consultation fee',
-                  style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                  style: TextStyle(fontSize: 12, color: PatientColors.textMuted)),
               const Spacer(),
               Text('Rs. 150',
                   style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textDark)),
+                      color: PatientColors.textStrong)),
             ],
           ),
         ],
@@ -410,11 +404,10 @@ class _DoctorCard extends StatelessWidget {
     required bool disabled,
     required VoidCallback onTap,
   }) {
-    final color = isBooked
-        ? const Color(0xFF9CAEA6)
-        : const Color(0xFF0B2B26);
+    final color =
+        isBooked ? PatientColors.textHint : PatientColors.textStrong;
     return Material(
-      color: isBooked ? AdminColors.bgSoft : AdminColors.bgSoft,
+      color: PatientColors.surfaceDeep,
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
         onTap: isBooked || disabled ? null : onTap,
@@ -424,8 +417,10 @@ class _DoctorCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-                color: isBooked ? AdminColors.border : AdminColors.borderLight),
-            color: isBooked ? AdminColors.bgSoft : AdminColors.surface,
+                color: isBooked
+                    ? PatientColors.border
+                    : PatientColors.borderStrong),
+            color: isBooked ? PatientColors.surfaceAlt : PatientColors.surface,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,

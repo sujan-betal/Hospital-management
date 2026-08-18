@@ -1,25 +1,16 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/widgets/panel_scaffold.dart';
 import '../../../../data/repositories/auth_repository.dart';
-import '../../../admin/presentation/admin_colors.dart';
-import '../../../admin/presentation/widgets/admin_common.dart';
 import '../../data/patient_models.dart';
 import '../../data/patient_repository.dart';
+import '../patient_colors.dart';
 import '../tabs/book_tab.dart';
 import '../tabs/profile_tab.dart';
 import '../tabs/records_tab.dart';
-
-enum PatientTab {
-  records('My Appointments & Bills', Icons.receipt_long_rounded),
-  book('Book Appointment', Icons.event_available_rounded),
-  profile('Profile Details', Icons.person_rounded);
-
-  const PatientTab(this.label, this.icon);
-
-  final String label;
-  final IconData icon;
-}
+import '../widgets/patient_common.dart';
+import '../widgets/patient_modals.dart';
+import '../widgets/patient_scaffold.dart';
+import '../widgets/patient_sidebar.dart';
 
 /// Patient portal — profile, appointments, billing and doctor bookings, all
 /// backed by the `/api/patient/*` endpoints. Mirrors the web patient dashboard.
@@ -42,7 +33,6 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
   List<BookedSlot> _bookedSlots = const [];
 
   late final String _userName;
-  late final String _userEmail;
 
   static String get today {
     final now = DateTime.now();
@@ -55,7 +45,6 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
     super.initState();
     final user = AuthRepository.cachedUser;
     _userName = (user?['user_name'] ?? user?['name'] ?? 'Patient') as String;
-    _userEmail = (user?['email'] ?? '') as String;
     _loadAll();
   }
 
@@ -82,7 +71,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      showAdminToast(context, 'Failed to load patient data: $e');
+      showPatientToast(context, 'Failed to load patient data: $e', error: true);
     }
   }
 
@@ -93,9 +82,9 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
       final saved = await PatientRepository.updateProfile(updated.toUpdatePayload());
       if (!mounted) return;
       setState(() => _profile = saved);
-      showAdminToast(context, 'Profile updated in the hospital database');
+      showPatientToast(context, 'Profile updated in the hospital database');
     } catch (e) {
-      if (mounted) showAdminToast(context, 'Failed to save profile: $e');
+      if (mounted) showPatientToast(context, 'Failed to save profile: $e', error: true);
       rethrow;
     }
   }
@@ -115,9 +104,13 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
         _appointments = [created, ..._appointments];
         _bookedSlots = [..._bookedSlots, BookedSlot(doctorName: doctor.name, time: slot)];
       });
+      showPatientToast(
+        context,
+        'Booking successful! Your consultation with ${doctor.name} is confirmed for $slot today.',
+      );
       return true;
     } catch (e) {
-      if (mounted) showAdminToast(context, 'Failed to book appointment: $e');
+      if (mounted) showPatientToast(context, 'Failed to book appointment: $e', error: true);
       return false;
     }
   }
@@ -132,7 +125,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
 
   // ---- Reschedule ----------------------------------------------------------
 
-  Future<void> _reschedule(
+  Future<bool> _reschedule(
       PatientAppointment appt, String date, String time) async {
     try {
       final updated =
@@ -140,7 +133,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
         'date': date,
         'time': time,
       });
-      if (!mounted) return;
+      if (!mounted) return true;
       setState(() {
         _appointments = [
           for (final a in _appointments)
@@ -148,9 +141,11 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
         ];
       });
       _refreshBookedSlots();
-      showAdminToast(context, 'Appointment rescheduled successfully');
+      showPatientToast(context, 'Appointment rescheduled successfully');
+      return true;
     } catch (e) {
-      if (mounted) showAdminToast(context, 'Failed to reschedule: $e');
+      if (mounted) showPatientToast(context, 'Failed to reschedule: $e', error: true);
+      return false;
     }
   }
 
@@ -160,10 +155,13 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
     try {
       final order = await PatientRepository.createPaymentOrder(appt.appointmentId);
       if (!mounted) return;
-      await showAdminModal<void>(
-        context,
+      await showPatientModal<void>(
+        context: context,
         title: 'Consultation Fee Payment',
         subtitle: 'Razorpay order created for ${appt.doctorName}',
+        icon: Icons.wallet_rounded,
+        iconBg: PatientColors.emeraldSoft,
+        iconColor: PatientColors.emeraldDark,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -177,20 +175,21 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AdminColors.bgSubtle,
-                borderRadius: BorderRadius.circular(10),
+                color: PatientColors.surfaceAlt,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: PatientColors.borderStrong),
               ),
               child: const Text(
                 'Complete the payment in the Razorpay checkout (opens in your browser). '
                 'Once verified, the fee status updates automatically.',
-                style: TextStyle(fontSize: 12, color: AdminColors.emerald600),
+                style: TextStyle(fontSize: 12, color: PatientColors.emeraldDark),
               ),
             ),
           ],
         ),
       );
     } catch (e) {
-      if (mounted) showAdminToast(context, 'Could not start payment: $e');
+      if (mounted) showPatientToast(context, 'Could not start payment: $e', error: true);
     }
   }
 
@@ -203,21 +202,21 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
                 style: const TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,
-                    color: AdminColors.emerald600)),
+                    color: PatientColors.emeraldDark)),
           ),
           Expanded(
             child: Text(value,
                 style: const TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF0B2B26))),
+                    color: PatientColors.textStrong)),
           ),
         ],
       );
 
   // ---- Review ---------------------------------------------------------------
 
-  Future<void> _submitReview(
+  Future<bool> _submitReview(
       PatientAppointment appt, int rating, String comment) async {
     try {
       final review = await PatientRepository.submitReview({
@@ -225,19 +224,20 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
         'rating': rating,
         'comment': comment,
       });
-      if (!mounted) return;
+      if (!mounted) return true;
       setState(() => _reviews = [review, ..._reviews]);
-      showAdminToast(
-          context, 'Thank you for rating Dr. ${appt.doctorName}!');
+      showPatientToast(context, 'Thank you for rating Dr. ${appt.doctorName}!');
+      return true;
     } catch (e) {
-      if (mounted) showAdminToast(context, 'Failed to submit review: $e');
+      if (mounted) showPatientToast(context, 'Failed to submit review: $e', error: true);
+      return false;
     }
   }
 
   // ---- Sign out ---------------------------------------------------------------
 
   Future<void> _signOut() async {
-    final ok = await showAdminConfirm(
+    final ok = await showPatientConfirm(
       context,
       title: 'Exit patient dashboard?',
       message: 'You will be returned to the login screen.',
@@ -253,16 +253,11 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    return PanelScaffold(
-      sectionLabel: 'Patient Portal',
-      tabs: [
-        for (final t in PatientTab.values) PanelTab(t.label, t.icon),
-      ],
-      current: _current.index,
+    return PatientScaffold(
+      current: _current,
       userName: _profile.userName.isNotEmpty ? _profile.userName : _userName,
-      userEmail: _profile.email.isNotEmpty ? _profile.email : _userEmail,
-      roleLabel: 'Patient',
-      onSelect: (i) => setState(() => _current = PatientTab.values[i]),
+      userPhone: _profile.phone,
+      onSelect: (t) => setState(() => _current = t),
       onSignOut: _signOut,
       body: _body(),
     );
@@ -271,7 +266,7 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
   Widget _body() {
     if (_loading) {
       return const Center(
-        child: CircularProgressIndicator(color: AdminColors.emerald600),
+        child: CircularProgressIndicator(color: PatientColors.emerald),
       );
     }
     return _tabFor(_current);
@@ -285,6 +280,8 @@ class _PatientDashboardPageState extends State<PatientDashboardPage> {
           appointments: _appointments,
           invoices: _invoices,
           reviews: _reviews,
+          today: today,
+          bookedSlots: _bookedSlots,
           onReschedule: _reschedule,
           onPayNow: _payNow,
           onSubmitReview: _submitReview,
