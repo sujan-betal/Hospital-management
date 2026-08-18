@@ -62,10 +62,6 @@ class AppRoutes {
           builder: (_) => const PatientDashboardPage(),
           settings: settings,
         );
-        return MaterialPageRoute(
-          builder: (_) => const PatientDashboardPage(),
-          settings: settings,
-        );
       default:
         return null;
     }
