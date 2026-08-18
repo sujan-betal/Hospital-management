@@ -84,29 +84,29 @@ class _ProfileTabState extends State<ProfileTab> {
     return LayoutBuilder(
       builder: (context, c) {
         final wide = c.maxWidth >= 900;
-        if (!wide) {
-          // Phones: stack the two cards full-width, each sized to its content
-          // so the form fields + save button are never clipped.
-          return Column(
+        return SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _overviewCard(),
-              const SizedBox(height: 18),
-              _editCard(),
+              if (wide)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: _overviewCard()),
+                    const SizedBox(width: 18),
+                    Expanded(flex: 2, child: _editCard()),
+                  ],
+                )
+              else ...[
+                // Phones: stack the two cards full-width, each sized to its
+                // content so the form fields + save button are never clipped.
+                _overviewCard(),
+                const SizedBox(height: 18),
+                _editCard(),
+              ],
             ],
-          );
-        }
-        return GridView.count(
-          crossAxisCount: 3,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 18,
-          crossAxisSpacing: 18,
-          childAspectRatio: 1.05,
-          children: [
-            _overviewCard(),
-            const SizedBox.shrink(),
-            _editCard(),
-          ],
+          ),
         );
       },
     );
