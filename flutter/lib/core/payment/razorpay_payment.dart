@@ -1,6 +1,10 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
+
+import 'razorpay_web_stub.dart'
+    if (dart.library.js_interop) 'razorpay_web.dart';
 
 /// Result of a completed Razorpay checkout.
 class RazorpayPaymentResult {
@@ -26,7 +30,55 @@ class RazorpayPayment {
   ///
   /// Resolves with the payment details on success, `null` when the user
   /// dismisses/cancels the checkout, or throws an `Exception` on failure.
+  ///
+  /// On Android/iOS the native `razorpay_flutter` SDK is used; on web the
+  /// official `checkout.js` is loaded via [RazorpayWeb]. Desktop platforms
+  /// (Windows/macOS/Linux) are not supported by either and throw a clear error.
   static Future<RazorpayPaymentResult?> open({
+    required String keyId,
+    required String orderId,
+    required int amount,
+    required String currency,
+    required String description,
+    required String name,
+    required String contact,
+    required String email,
+  }) {
+    if (kIsWeb) {
+      return RazorpayWeb.open(
+        keyId: keyId,
+        orderId: orderId,
+        amount: amount,
+        currency: currency,
+        description: description,
+        name: name,
+        contact: contact,
+        email: email,
+      );
+    }
+
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+      case TargetPlatform.iOS:
+        return _openNative(
+          keyId: keyId,
+          orderId: orderId,
+          amount: amount,
+          currency: currency,
+          description: description,
+          name: name,
+          contact: contact,
+          email: email,
+        );
+      default:
+        return Future.error(StateError(
+          'Razorpay checkout is not available on desktop. '
+          'Run the app on an Android emulator, a real device, or Chrome.',
+        ));
+    }
+  }
+
+  static Future<RazorpayPaymentResult?> _openNative({
     required String keyId,
     required String orderId,
     required int amount,
