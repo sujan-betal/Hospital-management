@@ -288,7 +288,7 @@ class _PaymentsTabState extends State<PaymentsTab> {
     return TableRow(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Row(
             children: [
               CircleAvatar(
@@ -344,28 +344,28 @@ class _PaymentsTabState extends State<PaymentsTab> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: _bulkCell('${d.payments}'),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: _moneyCell(formatMoney(d.collected)),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: _moneyCell(formatMoney(d.adminKeep)),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: _moneyCell(formatMoney(d.doctorShare),
               strong: true, color: AdminColors.emerald700),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: _moneyCell(formatMoney(d.paidOut)),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: d.pending > 0
               ? _pendingPill(formatMoney(d.pending))
               : const Text('—',
@@ -425,7 +425,7 @@ class _PaymentsTabState extends State<PaymentsTab> {
     return TableRow(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Text(
             p.appointmentId.length > 10
                 ? p.appointmentId.substring(0, 10).toUpperCase()
@@ -437,7 +437,7 @@ class _PaymentsTabState extends State<PaymentsTab> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Text(p.patientName,
               style: const TextStyle(
                   fontSize: 12.5,
@@ -445,16 +445,16 @@ class _PaymentsTabState extends State<PaymentsTab> {
                   color: AppColors.textDark)),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Text(p.doctorName,
               style: const TextStyle(fontSize: 11.5, color: AppColors.textBody)),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: _moneyCell(formatMoney(p.fee)),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Text('${p.doctorSharePercent}%',
               style: const TextStyle(
                   fontSize: 11,
@@ -462,16 +462,16 @@ class _PaymentsTabState extends State<PaymentsTab> {
                   color: AppColors.textMid)),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: _moneyCell(formatMoney(p.adminShare)),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: _moneyCell(formatMoney(p.doctorShare),
               strong: true, color: AdminColors.emerald700),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: _payoutChip(p),
         ),
       ],
@@ -483,7 +483,7 @@ class _PaymentsTabState extends State<PaymentsTab> {
   List<Widget> _headerCells(List<String> labels) => [
         for (final l in labels)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 9),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             child: Text(l,
                 style: const TextStyle(
                     fontSize: 10,

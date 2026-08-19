@@ -325,15 +325,15 @@ class _HeroBanner extends StatelessWidget {
                 children: [
                   titleCol,
                   const SizedBox(height: 18),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 10,
                     children: [
                       AdminButton(
                         label: 'Admit Patient',
                         icon: Icons.add_rounded,
                         onPressed: onAddAdmission,
                       ),
-                      const SizedBox(width: 12),
                       OutlinedButton(
                         onPressed: onAddTask,
                         child: const Text('Order Lab/Rx'),

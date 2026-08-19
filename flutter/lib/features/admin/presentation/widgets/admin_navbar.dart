@@ -125,17 +125,20 @@ class _AdminNavbarState extends State<AdminNavbar> {
   }
 
   void _showAlerts(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final menuWidth = (size.width - 32).clamp(240.0, 320.0);
     showMenu(
       context: context,
       position: RelativeRect.fromLTRB(
-          MediaQuery.of(context).size.width - 320, 72, 16, 0),
+          size.width - menuWidth - 16, 72, 16, 0),
       color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       items: [
         PopupMenuItem(
           enabled: false,
+          padding: EdgeInsets.zero,
           child: SizedBox(
-            width: 280,
+            width: menuWidth,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -158,17 +161,20 @@ class _AdminNavbarState extends State<AdminNavbar> {
   }
 
   void _showProfile(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    const menuWidth = 166.0;
     showMenu(
       context: context,
       position: RelativeRect.fromLTRB(
-          MediaQuery.of(context).size.width - 180, 72, 16, 0),
+          size.width - menuWidth - 16, 72, 16, 0),
       color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       items: [
         PopupMenuItem(
           enabled: false,
+          padding: EdgeInsets.zero,
           child: SizedBox(
-            width: 150,
+            width: menuWidth,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
