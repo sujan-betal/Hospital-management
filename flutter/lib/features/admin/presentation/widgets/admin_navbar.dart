@@ -66,7 +66,10 @@ class _AdminNavbarState extends State<AdminNavbar> {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final wide = constraints.maxWidth >= 900;
+          final w = constraints.maxWidth;
+          final showClock = w >= 640;
+          final showEr = w >= 900;
+          final showProfileText = w >= 640;
           return Row(
             children: [
               if (widget.onMenuTap != null) ...[
@@ -90,23 +93,28 @@ class _AdminNavbarState extends State<AdminNavbar> {
                           color: AppColors.textDark),
                     ),
                     const SizedBox(height: 2),
-                    const Text('Aura Medical Center Administration Console',
+                    Text('Aura Medical Center Administration Console',
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 10.5, color: AppColors.textMuted)),
+                        style: const TextStyle(
+                            fontSize: 10.5, color: AppColors.textMuted)),
                   ],
                 ),
               ),
-              if (wide) ...[
+              if (showEr) ...[
                 const _ErChip(),
                 const SizedBox(width: 16),
               ],
-              const _ClockChip(),
-              const SizedBox(width: 14),
+              if (showClock) ...[
+                const _ClockChip(),
+                const SizedBox(width: 14),
+              ],
               _BellButton(onTap: () => _showAlerts(context)),
               const SizedBox(width: 8),
               _ProfileChip(
                 userName: widget.userName,
                 userEmail: widget.userEmail,
+                showText: showProfileText,
                 onTap: () => _showProfile(context),
               ),
             ],
@@ -394,11 +402,13 @@ class _ProfileChip extends StatelessWidget {
     required this.userName,
     required this.userEmail,
     required this.onTap,
+    this.showText = true,
   });
 
   final String userName;
   final String userEmail;
   final VoidCallback onTap;
+  final bool showText;
 
   String get initials {
     final parts = userName.trim().split(RegExp(r'\s+'));
@@ -409,7 +419,7 @@ class _ProfileChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(6, 5, 10, 5),
+      padding: EdgeInsets.fromLTRB(6, 5, showText ? 10 : 6, 5),
       decoration: BoxDecoration(
         color: AdminColors.bgSoft,
         borderRadius: BorderRadius.circular(12),
@@ -430,23 +440,33 @@ class _ProfileChip extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                       fontSize: 12)),
             ),
-            const SizedBox(width: 8),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(userName,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textDark)),
-                const Text('Administrator',
-                    style:
-                        TextStyle(fontSize: 10.5, color: AppColors.textMuted)),
-              ],
-            ),
-            const Icon(Icons.expand_more_rounded, size: 18, color: AppColors.textMuted),
+            if (showText) ...[
+              const SizedBox(width: 8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 150),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(userName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textDark)),
+                    const Text('Administrator',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            TextStyle(fontSize: 10.5, color: AppColors.textMuted)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.expand_more_rounded,
+                  size: 18, color: AppColors.textMuted),
+            ],
           ],
         ),
       ),

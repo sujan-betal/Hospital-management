@@ -446,108 +446,128 @@ class _AdmissionTable extends StatelessWidget {
               ],
             );
           }
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _headerRow(),
-              for (final adm in admissions)
-                _dataRow(adm),
-              if (admissions.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(40),
-                  child: AdminEmpty(message: 'No patient admission records match your query.'),
-                ),
-            ],
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Table(
+              columnWidths: const {
+                0: IntrinsicColumnWidth(),
+                1: IntrinsicColumnWidth(),
+                2: IntrinsicColumnWidth(),
+                3: IntrinsicColumnWidth(),
+                4: IntrinsicColumnWidth(),
+                5: IntrinsicColumnWidth(),
+                6: IntrinsicColumnWidth(),
+                7: IntrinsicColumnWidth(),
+              },
+              defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+              children: [
+                _headerRow(),
+                for (final adm in admissions)
+                  _dataRow(adm),
+                if (admissions.isEmpty)
+                  TableRow(
+                    children: [
+                      TableCell(
+                        child: Padding(
+                          padding: const EdgeInsets.all(40),
+                          child: AdminEmpty(message: 'No patient admission records match your query.'),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
           );
         },
       ),
     );
   }
 
-  Widget _headerRow() {
-    const children = [
-      _Cell('Admission ID', flex: 1),
-      _Cell('Patient Details', flex: 2),
-      _Cell('Ward Category', flex: 1.2),
-      _Cell('Bed #', flex: 0.9),
-      _Cell('Hospitalization Dates', flex: 1.8),
-      _Cell('Treatment Bill', flex: 1.4),
-      _Cell('Status', flex: 1),
-      _Cell('Actions', flex: 1.4, alignRight: true),
-    ];
-    return Container(
-      color: AdminColors.bgSoft,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(children: children),
+  TableRow _headerRow() {
+    return TableRow(
+      decoration: const BoxDecoration(color: AdminColors.bgSoft),
+      children: const [
+        _Cell('Admission ID'),
+        _Cell('Patient Details'),
+        _Cell('Ward Category'),
+        _Cell('Bed #'),
+        _Cell('Hospitalization Dates'),
+        _Cell('Treatment Bill'),
+        _Cell('Status'),
+        _Cell('Actions', alignRight: true),
+      ],
     );
   }
 
-  Widget _dataRow(Admission adm) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+  TableRow _dataRow(Admission adm) {
+    return TableRow(
       decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AdminColors.bgSoft))),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 1,
-            child: Text(adm.id,
-                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AdminColors.emerald600)),
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Text(adm.id,
+              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AdminColors.emerald600)),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(adm.patientName,
+                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+              const SizedBox(height: 2),
+              Text('${adm.patientAge} yrs · ${adm.patientGender} · ${adm.patientPhone}',
+                  style: const TextStyle(fontSize: 10, color: AppColors.textBody)),
+            ],
           ),
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(adm.patientName,
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textDark)),
-                const SizedBox(height: 2),
-                Text('${adm.patientAge} yrs · ${adm.patientGender} · ${adm.patientPhone}',
-                    style: const TextStyle(fontSize: 10, color: AppColors.textBody)),
-              ],
-            ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Text(adm.wardType,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: _bedChip(adm.bedId),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(adm.admitDate,
+                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+              const SizedBox(width: 4),
+              const Icon(Icons.arrow_forward_rounded, size: 12, color: AppColors.textMuted),
+              const SizedBox(width: 4),
+              Text(adm.dischargeDate,
+                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.textDark)),
+            ],
           ),
-          Expanded(
-            flex: 1,
-            child: Text(adm.wardType,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMid)),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(formatMoney(adm.billingAmount),
+                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textDark)),
+              const SizedBox(width: 6),
+              _insurancePill(adm.insuranceStatus),
+            ],
           ),
-          Expanded(
-            flex: 1,
-            child: _bedChip(adm.bedId),
-          ),
-          Expanded(
-            flex: 2,
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: _statusPill(adm.status),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Align(
+            alignment: Alignment.centerRight,
             child: Row(
-              children: [
-                Text(adm.admitDate,
-                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.textDark)),
-                const SizedBox(width: 4),
-                const Icon(Icons.arrow_forward_rounded, size: 12, color: AppColors.textMuted),
-                const SizedBox(width: 4),
-                Text(adm.dischargeDate,
-                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.textDark)),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: Row(
-              children: [
-                Text(formatMoney(adm.billingAmount),
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textDark)),
-                const SizedBox(width: 6),
-                _insurancePill(adm.insuranceStatus),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: _statusPill(adm.status),
-          ),
-          Expanded(
-            flex: 1,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 if (adm.status == AdmissionStatus.scheduled)
                   _actionButton('Admit Inpatient', solid: true, onTap: () => onAction(adm, 'admit')),
@@ -561,8 +581,8 @@ class _AdmissionTable extends StatelessWidget {
               ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -626,16 +646,15 @@ class _AdmissionTable extends StatelessWidget {
 }
 
 class _Cell extends StatelessWidget {
-  const _Cell(this.text, {this.flex = 1, this.alignRight = false});
+  const _Cell(this.text, {this.alignRight = false});
 
   final String text;
-  final double flex;
   final bool alignRight;
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      flex: flex.toInt(),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Text(text,
           textAlign: alignRight ? TextAlign.right : TextAlign.left,
           style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.7, color: AppColors.textMuted)),

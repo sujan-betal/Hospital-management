@@ -434,10 +434,11 @@ class _WeeklyChart extends StatelessWidget {
           const SizedBox(height: 16),
           const Divider(height: 1, color: AdminColors.bgSoft),
           const SizedBox(height: 12),
-          Row(
+          Wrap(
+            spacing: 18,
+            runSpacing: 8,
             children: [
-              _LegendDot(color: AdminColors.emerald600, label: 'General/Pediatric Care'),
-              const SizedBox(width: 18),
+              const _LegendDot(color: AdminColors.emerald600, label: 'General/Pediatric Care'),
               const _LegendDot(color: Color(0xFFE8BA60), label: 'ICU / Critical Surges'),
             ],
           ),
