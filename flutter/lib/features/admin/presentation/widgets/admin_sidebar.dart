@@ -44,7 +44,7 @@ class AdminSidebar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _Brand(),
-          const SizedBox(height: 8),
+          const SizedBox(height: 14),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text('ADMINISTRATION',
@@ -54,7 +54,7 @@ class AdminSidebar extends StatelessWidget {
                     letterSpacing: 1.2,
                     color: AdminColors.emerald500.withOpacity(0.55))),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Expanded(child: _Menu(current: current, onSelect: onSelect)),
           _BottomProfile(
               userName: userName, userEmail: userEmail, onSignOut: onSignOut),
@@ -68,7 +68,7 @@ class _Brand extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+      padding: const EdgeInsets.fromLTRB(20, 26, 20, 20),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -132,7 +132,7 @@ class _Menu extends StatelessWidget {
               onTap: () => onSelect(tab),
               borderRadius: BorderRadius.circular(10),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 decoration: BoxDecoration(
                   color: selected ? AdminColors.emerald500.withOpacity(0.14) : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),

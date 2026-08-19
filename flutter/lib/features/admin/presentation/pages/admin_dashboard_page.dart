@@ -325,7 +325,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           final scaffoldKey = GlobalKey<ScaffoldState>();
           return Scaffold(
             key: scaffoldKey,
-            drawer: SizedBox(width: 260, child: sidebar),
+            drawer: SafeArea(
+              child: SizedBox(width: 260, child: sidebar),
+            ),
             body: Column(
               children: [
                 SafeArea(
@@ -338,7 +340,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                     onMenuTap: () => scaffoldKey.currentState?.openDrawer(),
                   ),
                 ),
-                Expanded(child: content),
+                Expanded(
+                  child: Container(
+                    color: AdminColors.canvas,
+                    padding: const EdgeInsets.all(14),
+                    child: content,
+                  ),
+                ),
               ],
             ),
           );

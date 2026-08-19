@@ -51,41 +51,67 @@ class _AdminNavbarState extends State<AdminNavbar> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 22),
+      height: 72,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: AdminColors.border)),
-      ),
-      child: Row(
-        children: [
-          if (widget.onMenuTap != null) ...[
-            IconButton(
-              onPressed: widget.onMenuTap,
-              icon: const Icon(Icons.menu_rounded, color: AppColors.textMid),
-            ),
-            const SizedBox(width: 4),
-          ],
-          Expanded(
-            child: Text(
-              widget.title,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textDark),
-            ),
-          ),
-          _ClockChip(),
-          const SizedBox(width: 16),
-          _BellButton(onTap: () => _showAlerts(context)),
-          const SizedBox(width: 8),
-          _ProfileChip(
-            userName: widget.userName,
-            userEmail: widget.userEmail,
-            onTap: () => _showProfile(context),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A0B2B26),
+            blurRadius: 8,
+            offset: Offset(0, 1),
           ),
         ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 900;
+          return Row(
+            children: [
+              if (widget.onMenuTap != null) ...[
+                IconButton(
+                  onPressed: widget.onMenuTap,
+                  icon: const Icon(Icons.menu_rounded, color: AppColors.textMid),
+                ),
+                const SizedBox(width: 4),
+              ],
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.title,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textDark),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text('Aura Medical Center Administration Console',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 10.5, color: AppColors.textMuted)),
+                  ],
+                ),
+              ),
+              if (wide) ...[
+                const _ErChip(),
+                const SizedBox(width: 16),
+              ],
+              const _ClockChip(),
+              const SizedBox(width: 14),
+              _BellButton(onTap: () => _showAlerts(context)),
+              const SizedBox(width: 8),
+              _ProfileChip(
+                userName: widget.userName,
+                userEmail: widget.userEmail,
+                onTap: () => _showProfile(context),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -94,7 +120,7 @@ class _AdminNavbarState extends State<AdminNavbar> {
     showMenu(
       context: context,
       position: RelativeRect.fromLTRB(
-          MediaQuery.of(context).size.width - 320, 56, 16, 0),
+          MediaQuery.of(context).size.width - 320, 72, 16, 0),
       color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       items: [
@@ -127,7 +153,7 @@ class _AdminNavbarState extends State<AdminNavbar> {
     showMenu(
       context: context,
       position: RelativeRect.fromLTRB(
-          MediaQuery.of(context).size.width - 180, 56, 16, 0),
+          MediaQuery.of(context).size.width - 180, 72, 16, 0),
       color: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       items: [
@@ -178,7 +204,37 @@ class _AdminNavbarState extends State<AdminNavbar> {
   }
 }
 
+class _ErChip extends StatelessWidget {
+  const _ErChip();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AdminColors.rose50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AdminColors.rose100),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.circle, size: 8, color: AdminColors.rose),
+          SizedBox(width: 6),
+          Text('ER Capacity: 80%',
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: AdminColors.rose)),
+        ],
+      ),
+    );
+  }
+}
+
 class _ClockChip extends StatelessWidget {
+  const _ClockChip();
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
@@ -198,8 +254,9 @@ class _ClockChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.circle, size: 8, color: Dot.online),
-          const SizedBox(width: 7),
+          const Icon(Icons.access_time_rounded,
+              size: 14, color: AdminColors.emerald600),
+          const SizedBox(width: 6),
           Text('$label · ${time.format(context)}',
               style: const TextStyle(
                   fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textMid)),
@@ -216,32 +273,39 @@ class _BellButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: onTap,
-      icon: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          const Icon(Icons.notifications_none_rounded,
-              color: AppColors.textMid, size: 22),
-          Positioned(
-            right: -2,
-            top: -2,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: const BoxDecoration(
-                color: AdminColors.rose,
-                shape: BoxShape.circle,
-              ),
-              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-              child: const Text('3',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
-            ),
-          ),
-        ],
+    return Container(
+      decoration: BoxDecoration(
+        color: AdminColors.bgSoft,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AdminColors.border),
       ),
-      tooltip: 'Notifications',
+      child: IconButton(
+        onPressed: onTap,
+        icon: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const Icon(Icons.notifications_none_rounded,
+                color: AppColors.textMid, size: 22),
+            Positioned(
+              right: -2,
+              top: -2,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: AdminColors.rose,
+                  shape: BoxShape.circle,
+                ),
+                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                child: const Text('3',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ],
+        ),
+        tooltip: 'Notifications',
+      ),
     );
   }
 }
@@ -344,39 +408,47 @@ class _ProfileChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: AppColors.primary,
-            child: Text(initials,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12)),
-          ),
-          const SizedBox(width: 8),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(userName,
-                  overflow: TextOverflow.ellipsis,
+    return Container(
+      padding: const EdgeInsets.fromLTRB(6, 5, 10, 5),
+      decoration: BoxDecoration(
+        color: AdminColors.bgSoft,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AdminColors.border),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: AppColors.primary,
+              child: Text(initials,
                   style: const TextStyle(
-                      fontSize: 12.5,
+                      color: Colors.white,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textDark)),
-              const Text('Administrator',
-                  style:
-                      TextStyle(fontSize: 10.5, color: AppColors.textMuted)),
-            ],
-          ),
-          const Icon(Icons.expand_more_rounded, size: 18, color: AppColors.textMuted),
-        ],
+                      fontSize: 12)),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(userName,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textDark)),
+                const Text('Administrator',
+                    style:
+                        TextStyle(fontSize: 10.5, color: AppColors.textMuted)),
+              ],
+            ),
+            const Icon(Icons.expand_more_rounded, size: 18, color: AppColors.textMuted),
+          ],
+        ),
       ),
     );
   }
