@@ -153,49 +153,6 @@ class _LoginCardState extends State<LoginCard> {
                               onVerify: _verifyPatientOtp,
                             ),
                     ),
-                    const SizedBox(height: 18),
-                    const Row(
-                      children: [
-                        Expanded(child: Divider(height: 1)),
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 12),
-                          child: Text(
-                            'OR',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1,
-                              color: AppColors.textHint,
-                            ),
-                          ),
-                        ),
-                        Expanded(child: Divider(height: 1)),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    SizedBox(
-                      height: 46,
-                      child: OutlinedButton.icon(
-                        onPressed: () => Navigator.of(context)
-                            .pushNamedAndRemoveUntil(
-                          '/dashboard/admin',
-                          (_) => false,
-                        ),
-                        icon: const Icon(Icons.admin_panel_settings_rounded,
-                            size: 18),
-                        label: const Text(
-                          'Skip login — demo Admin Console',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.emeraldDark,
-                          side: BorderSide(
-                              color: AppColors.emeraldDark.withValues(alpha: 0.35)),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -220,6 +177,9 @@ class _LoginCardState extends State<LoginCard> {
             borderRadius: BorderRadius.circular(16),
           ),
           child: Stack(
+            // Center the tab labels vertically so "Patient" / "Staff" sit in
+            // the middle of the toggle (Stack defaults to topStart otherwise).
+            alignment: Alignment.center,
             children: [
               AnimatedPositioned(
                 duration: const Duration(milliseconds: 350),

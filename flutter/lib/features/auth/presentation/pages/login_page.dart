@@ -98,11 +98,6 @@ class _CompactLayout extends StatelessWidget {
                         delay: const Duration(milliseconds: 150),
                         child: const LoginCard(),
                       ),
-                      const SizedBox(height: 24),
-                      const AnimatedEntrance(
-                        delay: Duration(milliseconds: 300),
-                        child: _QuickDemoPortals(),
-                      ),
                       const SizedBox(height: 20),
                       const AnimatedEntrance(
                         delay: Duration(milliseconds: 400),
@@ -169,11 +164,6 @@ class _RightPanel extends StatelessWidget {
                       type: EntranceType.scaleIn,
                       delay: const Duration(milliseconds: 150),
                       child: const LoginCard(),
-                    ),
-                    const SizedBox(height: 24),
-                    const AnimatedEntrance(
-                      delay: Duration(milliseconds: 300),
-                      child: _QuickDemoPortals(),
                     ),
                     const SizedBox(height: 20),
                     const AnimatedEntrance(
@@ -243,125 +233,6 @@ class _MobileBrandHeader extends StatelessWidget {
             fontWeight: FontWeight.w500,
             color: AppColors.textMuted,
           ),
-        ),
-      ],
-    );
-  }
-}
-
-/* ────────────────────────────────────────────────────────────────
-   Quick demo access portals grid
-   ──────────────────────────────────────────────────────────────── */
-
-class _DemoPortalLink extends StatelessWidget {
-  const _DemoPortalLink({
-    required this.icon,
-    required this.label,
-    required this.primary,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool primary;
-
-  @override
-  Widget build(BuildContext context) {
-    final dark = primary;
-    return InkWell(
-      onTap: () {},
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        height: 38,
-        decoration: BoxDecoration(
-          color: dark ? AppColors.primary : const Color(0x0D10B981),
-          border: Border.all(
-            color: dark ? const Color(0xFF1E5D52) : const Color(0x2610B981),
-          ),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 14,
-              color: dark ? Colors.white : const Color(0xFF047857),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: dark ? Colors.white : const Color(0xFF047857),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _QuickDemoPortals extends StatelessWidget {
-  const _QuickDemoPortals();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(height: 1, color: const Color(0xFFEEF4F1)),
-        const SizedBox(height: 16),
-        const Text(
-          'QUICK DEMO ACCESS PORTALS',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 11,
-            letterSpacing: 1.5,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textMuted,
-          ),
-        ),
-        const SizedBox(height: 10),
-        const Row(
-          children: [
-            Expanded(
-              child: _DemoPortalLink(
-                icon: Icons.smartphone,
-                label: 'Patient Panel',
-                primary: false,
-              ),
-            ),
-            SizedBox(width: 8),
-            Expanded(
-              child: _DemoPortalLink(
-                icon: Icons.medical_services,
-                label: 'Doctor Panel',
-                primary: false,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        const Row(
-          children: [
-            Expanded(
-              child: _DemoPortalLink(
-                icon: Icons.verified_user,
-                label: 'Receptionist',
-                primary: false,
-              ),
-            ),
-            SizedBox(width: 8),
-            Expanded(
-              child: _DemoPortalLink(
-                icon: Icons.monitor_heart,
-                label: 'Admin Console',
-                primary: true,
-              ),
-            ),
-          ],
         ),
       ],
     );
