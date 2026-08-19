@@ -38,7 +38,7 @@ class AdmissionCreateRequest(BaseModel):
     patient_age: int = Field(..., ge=0, le=150)
     patient_gender: str = Field(default="Male", max_length=20)
     ward_type: str = Field(default="General Ward", max_length=50)
-    bed_id: str = Field(default="Pending", max_length=50)
+    bed_id: str | None = Field(default="Pending", max_length=50)
     admit_date: str = Field(..., min_length=4, max_length=30)
     discharge_date: str | None = Field(default=None, max_length=30)
     billing_amount: int = Field(default=0, ge=0)

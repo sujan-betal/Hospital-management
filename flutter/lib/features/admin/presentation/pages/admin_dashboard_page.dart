@@ -129,7 +129,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         'patient_age': a.patientAge,
         'patient_gender': a.patientGender.toUpperCase(),
         'ward_type': a.wardType,
-        'bed_id': a.bedId == 'Pending' ? null : a.bedId,
+        'bed_id': a.bedId.isEmpty ? 'Pending' : a.bedId,
         'admit_date': a.admitDate,
         'discharge_date': a.dischargeDate,
         'billing_amount': a.billingAmount,
