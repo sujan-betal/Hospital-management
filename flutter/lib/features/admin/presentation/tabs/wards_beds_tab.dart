@@ -336,7 +336,11 @@ class _WardsAndBedsTabState extends State<WardsAndBedsTab> {
                   field: DropdownButtonFormField<String>(
                     value: _editNurse,
                     isExpanded: true,
-                    items: _nursesList.map((n) => DropdownMenuItem(value: n, child: Text(n))).toList(),
+                    items: [
+                      if (!_nursesList.contains(_editNurse))
+                        DropdownMenuItem(value: _editNurse, child: Text(_editNurse)),
+                      ..._nursesList.map((n) => DropdownMenuItem(value: n, child: Text(n))).toList(),
+                    ],
                     onChanged: (v) => setLocal(() => _editNurse = v ?? ''),
                     decoration: InputDecoration(border: modalFieldBorder(), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
                   ),

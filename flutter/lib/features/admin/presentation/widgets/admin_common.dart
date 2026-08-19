@@ -623,8 +623,9 @@ class SegmentedFilter extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AdminColors.borderLight),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Wrap(
+        spacing: 0,
+        runSpacing: 0,
         children: options.map((opt) {
           final isSelected = opt == selected;
           return GestureDetector(

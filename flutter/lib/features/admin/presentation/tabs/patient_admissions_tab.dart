@@ -80,6 +80,7 @@ class _PatientAdmissionsTabState extends State<PatientAdmissionsTab> {
   }
 
   void _openCreate() {
+    _bedId = 'Pending';
     showAdminModal(context,
         title: 'Create Inpatient Admission',
         subtitle: 'Register new clinical intake and allocate ward space',

@@ -120,71 +120,98 @@ class _HospitalSettingsTabState extends State<HospitalSettingsTab> {
           _card(
             icon: Icons.credit_card_rounded,
             title: 'Co-pay & Emergency Markups',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isWide = constraints.maxWidth >= 560;
+                final copay = _numberField('Standard Co-pay (%)', _copay,
+                    (v) => setState(() => _copay = v));
+                final markup = _numberField('Emergency Bed Markup (%)', _emergencyMarkup,
+                    (v) => setState(() => _emergencyMarkup = v));
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(
-                      child: _numberField('Standard Co-pay (%)', _copay,
-                          (v) => setState(() => _copay = v)),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: _numberField('Emergency Bed Markup (%)', _emergencyMarkup,
-                          (v) => setState(() => _emergencyMarkup = v)),
+                    if (isWide)
+                      Row(
+                        children: [
+                          Expanded(child: copay),
+                          const SizedBox(width: 14),
+                          Expanded(child: markup),
+                        ],
+                      )
+                    else ...[
+                      copay,
+                      const SizedBox(height: 14),
+                      markup,
+                    ],
+                    const SizedBox(height: 14),
+                    _toggleRow(
+                      title: 'Enable Auto ICU Telemetry Monitoring',
+                      subtitle: 'Poll vital stats to central dashboard every 3s',
+                      value: _autoTelemetry,
+                      onChanged: (v) => setState(() => _autoTelemetry = v),
                     ),
                   ],
-                ),
-                const SizedBox(height: 14),
-                _toggleRow(
-                  title: 'Enable Auto ICU Telemetry Monitoring',
-                  subtitle: 'Poll vital stats to central dashboard every 3s',
-                  value: _autoTelemetry,
-                  onChanged: (v) => setState(() => _autoTelemetry = v),
-                ),
-              ],
+                );
+              },
             ),
           ),
           const SizedBox(height: 18),
           _card(
             icon: Icons.schedule_rounded,
             title: 'Ward Operations Settings',
-            child: Row(
-              children: [
-                Expanded(
-                  child: ModalField(
-                    label: 'Bed Sanitization Cycle',
-                    field: DropdownButtonFormField<int>(
-                      value: _sanitationInterval,
-                      isExpanded: true,
-                      items: const [
-                        DropdownMenuItem(value: 6, child: Text('Every 6 Hours')),
-                        DropdownMenuItem(value: 12, child: Text('Every 12 Hours (Standard)')),
-                        DropdownMenuItem(value: 24, child: Text('Every 24 Hours')),
-                      ],
-                      onChanged: (v) => setState(() => _sanitationInterval = v ?? 12),
-                      decoration: InputDecoration(border: modalFieldBorder(), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
-                    ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isWide = constraints.maxWidth >= 560;
+                final known = const [6, 12, 24];
+                final cycle = ModalField(
+                  label: 'Bed Sanitization Cycle',
+                  field: DropdownButtonFormField<int>(
+                    value: known.contains(_sanitationInterval) ? _sanitationInterval : 12,
+                    isExpanded: true,
+                    items: [
+                      if (!known.contains(_sanitationInterval))
+                        DropdownMenuItem(
+                            value: _sanitationInterval,
+                            child: Text('Every $_sanitationInterval Hours')),
+                      const DropdownMenuItem(value: 6, child: Text('Every 6 Hours')),
+                      const DropdownMenuItem(value: 12, child: Text('Every 12 Hours (Standard)')),
+                      const DropdownMenuItem(value: 24, child: Text('Every 24 Hours')),
+                    ],
+                    onChanged: (v) => setState(() => _sanitationInterval = v ?? 12),
+                    decoration: InputDecoration(border: modalFieldBorder(), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: ModalField(
-                    label: 'Auto-Sanitize Trigger',
-                    field: DropdownButtonFormField<String>(
-                      value: _autoDirty ? 'on' : 'off',
-                      isExpanded: true,
-                      items: const [
-                        DropdownMenuItem(value: 'on', child: Text('Immediately on Inpatient Discharge')),
-                        DropdownMenuItem(value: 'off', child: Text('Manual logs only')),
-                      ],
-                      onChanged: (v) => setState(() => _autoDirty = v == 'on'),
-                      decoration: InputDecoration(border: modalFieldBorder(), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
-                    ),
+                );
+                final trigger = ModalField(
+                  label: 'Auto-Sanitize Trigger',
+                  field: DropdownButtonFormField<String>(
+                    value: _autoDirty ? 'on' : 'off',
+                    isExpanded: true,
+                    items: const [
+                      DropdownMenuItem(value: 'on', child: Text('Immediately on Inpatient Discharge')),
+                      DropdownMenuItem(value: 'off', child: Text('Manual logs only')),
+                    ],
+                    onChanged: (v) => setState(() => _autoDirty = v == 'on'),
+                    decoration: InputDecoration(border: modalFieldBorder(), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
                   ),
-                ),
-              ],
+                );
+                if (isWide) {
+                  return Row(
+                    children: [
+                      Expanded(child: cycle),
+                      const SizedBox(width: 14),
+                      Expanded(child: trigger),
+                    ],
+                  );
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    cycle,
+                    const SizedBox(height: 14),
+                    trigger,
+                  ],
+                );
+              },
             ),
           ),
           const SizedBox(height: 18),
