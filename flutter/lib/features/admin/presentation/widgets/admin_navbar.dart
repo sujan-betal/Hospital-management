@@ -139,20 +139,23 @@ class _AdminNavbarState extends State<AdminNavbar> {
           padding: EdgeInsets.zero,
           child: SizedBox(
             width: menuWidth,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Notifications',
-                    style:
-                        TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 12),
-                for (final a in _alertItems) ...[
-                  _AlertTile(item: a),
-                  if (a != _alertItems.last)
-                    const Divider(height: 1, color: AdminColors.border),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Notifications',
+                      style:
+                          TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 12),
+                  for (final a in _alertItems) ...[
+                    _AlertTile(item: a),
+                    if (a != _alertItems.last)
+                      const Divider(height: 1, color: AdminColors.border),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -162,7 +165,7 @@ class _AdminNavbarState extends State<AdminNavbar> {
 
   void _showProfile(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    const menuWidth = 166.0;
+    const menuWidth = 170.0;
     showMenu(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -175,26 +178,31 @@ class _AdminNavbarState extends State<AdminNavbar> {
           padding: EdgeInsets.zero,
           child: SizedBox(
             width: menuWidth,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(widget.userName,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textDark)),
-                Text(widget.userEmail,
-                    overflow: TextOverflow.ellipsis,
-                    style:
-                        const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-              ],
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(widget.userName,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textDark)),
+                  const SizedBox(height: 3),
+                  Text(widget.userEmail,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                ],
+              ),
             ),
           ),
         ),
         PopupMenuItem(
           height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Row(
             children: [
               const Icon(Icons.logout_rounded, size: 16, color: AdminColors.rose),
