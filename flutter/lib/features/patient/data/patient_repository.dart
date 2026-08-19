@@ -9,10 +9,36 @@ import 'patient_models.dart';
 class PatientRepository {
   PatientRepository._();
 
+  // ---- Test hooks ----------------------------------------------------------
+
+  /// Test-only substitutions for the network calls. Widget tests set these to
+  /// drive the patient panel without a backend; when set, a method returns the
+  /// fake's result instead of hitting [ApiClient].
+  @visibleForTesting
+  static Future<PatientProfile> Function()? debugGetProfile;
+  @visibleForTesting
+  static Future<List<PatientAppointment>> Function()? debugListAppointments;
+  @visibleForTesting
+  static Future<List<PatientInvoice>> Function()? debugListInvoices;
+  @visibleForTesting
+  static Future<List<PatientDoctor>> Function()? debugListDoctors;
+  @visibleForTesting
+  static Future<List<PatientReview>> Function()? debugListReviews;
+  @visibleForTesting
+  static Future<List<BookedSlot>> Function(String date)? debugListBookedSlots;
+  @visibleForTesting
+  static Future<PatientPaymentOrder> Function(String appointmentId)?
+      debugCreatePaymentOrder;
+  @visibleForTesting
+  static Future<Map<String, dynamic>> Function(
+      String appointmentId, Map<String, dynamic> payload)? debugVerifyPayment;
+
   // ---- Profile -----------------------------------------------------------
 
   /// `GET /api/patient/me`
   static Future<PatientProfile> getProfile() async {
+    final stub = debugGetProfile;
+    if (stub != null) return stub();
     final json = await ApiClient.instance.get('/api/patient/me');
     return PatientProfile.fromApi(
         (json['data'] ?? const <String, dynamic>{}) as Map<String, dynamic>);
@@ -30,6 +56,8 @@ class PatientRepository {
 
   /// `GET /api/patient/doctors`
   static Future<List<PatientDoctor>> listDoctors() async {
+    final stub = debugListDoctors;
+    if (stub != null) return stub();
     final json = await ApiClient.instance.get('/api/patient/doctors');
     return ((json['data'] ?? const []) as List)
         .map((e) => PatientDoctor.fromApi(e as Map<String, dynamic>))
@@ -40,6 +68,8 @@ class PatientRepository {
 
   /// `GET /api/patient/appointments`
   static Future<List<PatientAppointment>> listAppointments() async {
+    final stub = debugListAppointments;
+    if (stub != null) return stub();
     final json = await ApiClient.instance.get('/api/patient/appointments');
     return ((json['data'] ?? const []) as List)
         .map((e) => PatientAppointment.fromApi(e as Map<String, dynamic>))
@@ -48,6 +78,8 @@ class PatientRepository {
 
   /// `GET /api/patient/appointments/booked-slots?date=YYYY-MM-DD`
   static Future<List<BookedSlot>> listBookedSlots(String date) async {
+    final stub = debugListBookedSlots;
+    if (stub != null) return stub(date);
     final json = await ApiClient.instance
         .get('/api/patient/appointments/booked-slots?date=${Uri.encodeQueryComponent(date)}');
     return ((json['data'] ?? const []) as List)
@@ -77,6 +109,8 @@ class PatientRepository {
   /// `POST /api/patient/appointments/{appointment_id}/payment/order`
   static Future<PatientPaymentOrder> createPaymentOrder(
       String appointmentId) async {
+    final stub = debugCreatePaymentOrder;
+    if (stub != null) return stub(appointmentId);
     final json = await ApiClient.instance
         .post('/api/patient/appointments/$appointmentId/payment/order');
     return PatientPaymentOrder.fromJson(
@@ -88,6 +122,8 @@ class PatientRepository {
     String appointmentId,
     Map<String, dynamic> payload,
   ) async {
+    final stub = debugVerifyPayment;
+    if (stub != null) return stub(appointmentId, payload);
     final json = await ApiClient.instance
         .post('/api/patient/appointments/$appointmentId/payment/verify', payload);
     return (json['data'] ?? const <String, dynamic>{}) as Map<String, dynamic>;
@@ -97,6 +133,8 @@ class PatientRepository {
 
   /// `GET /api/patient/invoices`
   static Future<List<PatientInvoice>> listInvoices() async {
+    final stub = debugListInvoices;
+    if (stub != null) return stub();
     final json = await ApiClient.instance.get('/api/patient/invoices');
     return ((json['data'] ?? const []) as List)
         .map((e) => PatientInvoice.fromApi(e as Map<String, dynamic>))
@@ -107,6 +145,8 @@ class PatientRepository {
 
   /// `GET /api/patient/reviews`
   static Future<List<PatientReview>> listReviews() async {
+    final stub = debugListReviews;
+    if (stub != null) return stub();
     final json = await ApiClient.instance.get('/api/patient/reviews');
     return ((json['data'] ?? const []) as List)
         .map((e) => PatientReview.fromApi(e as Map<String, dynamic>))

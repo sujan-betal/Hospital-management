@@ -26,6 +26,21 @@ class RazorpayPaymentResult {
 class RazorpayPayment {
   RazorpayPayment._();
 
+  /// Test-only substitution for [open]. Widget tests replace the native/web
+  /// SDK (neither is available under `flutter test`) with a fake and assert on
+  /// the exact options the patient panel passes to the checkout.
+  @visibleForTesting
+  static Future<RazorpayPaymentResult?> Function({
+    required String keyId,
+    required String orderId,
+    required int amount,
+    required String currency,
+    required String description,
+    required String name,
+    required String contact,
+    required String email,
+  })? debugOpenOverride;
+
   /// Opens the Razorpay checkout for a previously created order.
   ///
   /// Resolves with the payment details on success, `null` when the user
@@ -44,6 +59,19 @@ class RazorpayPayment {
     required String contact,
     required String email,
   }) {
+    final override = debugOpenOverride;
+    if (override != null) {
+      return override(
+        keyId: keyId,
+        orderId: orderId,
+        amount: amount,
+        currency: currency,
+        description: description,
+        name: name,
+        contact: contact,
+        email: email,
+      );
+    }
     if (kIsWeb) {
       return RazorpayWeb.open(
         keyId: keyId,
